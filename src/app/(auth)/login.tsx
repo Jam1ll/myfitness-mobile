@@ -1,63 +1,71 @@
-import * as AuthSession from 'expo-auth-session';
+import {
+  GoogleSignin,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
 import { Alert, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { axiosClient } from '../../api/axiosClient';
 
-WebBrowser.maybeCompleteAuthSession();
-
-const discovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-};
-
 export default function LoginScreen() {
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID!,
-      scopes: ['openid', 'profile', 'email'],
-      responseType: AuthSession.ResponseType.IdToken, 
-      redirectUri: AuthSession.makeRedirectUri(),
-      usePKCE: false,
-      extraParams: {
-        nonce: 'myfitness_nonce_secure', 
-      },
-    },
-    discovery
-  );
-
   useEffect(() => {
-    if (response?.type === 'success') {
-      const idToken = response.params.id_token;
-      verifyTokenWithBackend(idToken);
-    } else if (response?.type === 'error') {
-      console.error("Error de Google:", response.error);
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID!,
+      offlineAccess: true,
+    });
+  }, []);
+
+  const signInWithGoogle = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      
+      const idToken = response?.data?.idToken;
+      // Capturamos el primer nombre que nos da Google
+      const firstName = response?.data?.user?.givenName || response?.data?.user?.name || 'Atleta';
+      
+      if (idToken) {
+        if (Platform.OS === 'web') {
+          localStorage.setItem('user_name', firstName);
+        } else {
+          await SecureStore.setItemAsync('user_name', firstName);
+        }
+        
+        await verifyTokenWithBackend(idToken);
+      } else {
+        throw new Error("Failed to get Google token");
+      }
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        console.log('Login cancelled');
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        console.log('Login already in progress');
+      } else {
+        console.error('Error de Google Sign-In:', error);
+        Alert.alert('Error', 'Failed to login with Google.');
+      }
     }
-  }, [response]);
+  };
 
   const verifyTokenWithBackend = async (googleToken: string) => {
     try {
-      console.log("Enviando token al backend...");
+      console.log("Sending token to backend...");
       
       const res = await axiosClient.post('/auth/google', { idToken: googleToken });
       const myFitnessJwt = res.data.token; 
 
-      // Alternamos el método de guardado según la plataforma
       if (Platform.OS === 'web') {
         localStorage.setItem('jwt_token', myFitnessJwt);
       } else {
         await SecureStore.setItemAsync('jwt_token', myFitnessJwt);
       }
       
-      console.log("¡Backend autenticado! JWT guardado localmente.");
+      console.log("Backend authenticated! JWT saved.");
       router.replace('/(tabs)/routines');
-
     } catch (error) {
-      console.error("Error en la conexión con el backend:", error);
-      Alert.alert("Error de validación", "No se pudo conectar con el servidor.");
+      console.error("Error connecting to backend:", error);
+      Alert.alert("Validation error", "Failed to connect to server.");
     }
   };
 
@@ -71,12 +79,11 @@ export default function LoginScreen() {
       </Text>
       
       <TouchableOpacity
-        disabled={!request} 
-        onPress={() => promptAsync()}
+        onPress={signInWithGoogle}
         className="w-full py-4 bg-white rounded-xl flex-row justify-center items-center active:opacity-80"
       >
         <Text className="text-black text-lg font-semibold tracking-wide">
-          Continuar con Google
+          Continue with Google
         </Text>
       </TouchableOpacity>
     </View>

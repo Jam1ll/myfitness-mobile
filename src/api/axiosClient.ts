@@ -2,7 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.0.5:8080/api/v1';
 
 export const axiosClient = axios.create({
   baseURL: API_URL,
@@ -12,10 +12,10 @@ export const axiosClient = axios.create({
   },
 });
 
-// Interceptor de peticiones
+// Request interceptor
 axiosClient.interceptors.request.use(
   async (config) => {
-    // Alternamos el método de lectura según la plataforma
+    // Read token based on platform
     let token = null;
     if (Platform.OS === 'web') {
       token = localStorage.getItem('jwt_token');
@@ -31,7 +31,7 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor de respuestas
+// Response interceptor
 axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
