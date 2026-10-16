@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
 import { Alert, Platform, Text, TouchableOpacity, View } from 'react-native';
-import { axiosClient } from '../../api/axiosClient';
+import { axiosClient, setAuthToken } from '../../api/axiosClient';
 
 export default function LoginScreen() {
   useEffect(() => {
@@ -22,7 +22,6 @@ export default function LoginScreen() {
       const response = await GoogleSignin.signIn();
       
       const idToken = response?.data?.idToken;
-      // Capturamos el primer nombre que nos da Google
       const firstName = response?.data?.user?.givenName || response?.data?.user?.name || 'Atleta';
       
       if (idToken) {
@@ -55,11 +54,9 @@ export default function LoginScreen() {
       const res = await axiosClient.post('/auth/google', { idToken: googleToken });
       const myFitnessJwt = res.data.token; 
 
-      if (Platform.OS === 'web') {
-        localStorage.setItem('jwt_token', myFitnessJwt);
-      } else {
-        await SecureStore.setItemAsync('jwt_token', myFitnessJwt);
-      }
+      if (!myFitnessJwt) throw new Error("No se recibió token del backend");
+
+      await setAuthToken(myFitnessJwt);
       
       console.log("Backend authenticated! JWT saved.");
       router.replace('/(tabs)/routines');

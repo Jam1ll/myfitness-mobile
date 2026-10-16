@@ -1,24 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { axiosClient } from '../../api/axiosClient';
 
 const MUSCLE_GROUPS = [
-  'CHEST', 'BACK', 'ARMS', 'LEGS', 'CORE', 'SHOULDERS', 'FULL_BODY',
+  'CHEST', 'BACK', 'ARMS', 'LEGS', 'CORE', 'SHOULDERS',
 ] as const;
 
 type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
@@ -75,6 +75,16 @@ export default function ExercisesScreen() {
   };
 
   const handleCreateExercise = async () => {
+    // Validamos localmente antes de hacer la petición para ahorrar viajes a K8s
+    if (!name || name.trim().length < 3) {
+      Alert.alert('Validation Error', 'Exercise name must have at least 3 characters.');
+      return;
+    }
+    if (!description || description.trim().length < 10) {
+      Alert.alert('Validation Error', 'Description must have at least 10 characters.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       await axiosClient.post('/exercises', {
@@ -83,14 +93,18 @@ export default function ExercisesScreen() {
       setIsModalVisible(false);
       resetForm();
       await fetchExercises();
-    } catch (error) {
-      console.error('Error al crear ejercicio:', error);
-      Alert.alert('Error', 'No se pudo guardar el ejercicio.');
+    } catch (error: any) {
+      console.error('Error completo del servidor:', JSON.stringify(error.response?.data, null, 2));
+      
+      // Como el backend devuelve un 400 por validación fallida, informamos al usuario de forma clara
+      Alert.alert(
+        'Validation Error', 
+        'Please check that your description has at least 10 characters and all fields are filled correctly.'
+      );
     } finally {
       setIsSaving(false);
     }
   };
-
   return (
     <SafeAreaView className="flex-1 bg-black" edges={['top']}>
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
