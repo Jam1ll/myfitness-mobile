@@ -59,7 +59,7 @@ export default function LoginScreen() {
       await setAuthToken(myFitnessJwt);
       
       console.log("Backend authenticated! JWT saved.");
-      router.replace('/(tabs)/routines');
+      router.replace('/routines')
     } catch (error) {
       console.error("Error connecting to backend:", error);
       Alert.alert("Validation error", "Failed to connect to server.");

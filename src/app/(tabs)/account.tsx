@@ -7,9 +7,7 @@ import { setAuthToken } from '../../api/axiosClient';
 export default function AccountScreen() {
   const handleLogout = async () => {
     try {
-      // Borramos el token de memoria, SecureStore y LocalStorage
       await setAuthToken(null);
-      // Redirigimos al login
       router.replace('/login');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
@@ -24,7 +22,7 @@ export default function AccountScreen() {
         <Text className="text-gray-400 text-base mt-1">Manage your profile and session</Text>
       </View>
 
-      {/* Botón de Log Out posicionado al fondo */}
+      {/* Botón de Log Out */}
       <View className="mb-6">
         <TouchableOpacity
           activeOpacity={0.8}

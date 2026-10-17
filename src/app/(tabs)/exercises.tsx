@@ -1,34 +1,11 @@
+import CreateExerciseModal, { CreateExercisePayload } from '@/features/catalog/components/CreateExerciseModal';
+import ExerciseDetailsModal, { ExerciseResponse } from '@/features/catalog/components/ExerciseDetailsModal';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { axiosClient } from '../../api/axiosClient';
 
-const MUSCLE_GROUPS = [
-  'CHEST', 'BACK', 'ARMS', 'LEGS', 'CORE', 'SHOULDERS',
-] as const;
-
-type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
-
-type ExerciseResponse = {
-  id: string;
-  name: string;
-  description: string;
-  muscleGroup: string;
-};
 
 function shortenDescription(description: string) {
   if (!description) return '';
@@ -37,21 +14,30 @@ function shortenDescription(description: string) {
 }
 
 export default function ExercisesScreen() {
-  const [workouts, setWorkouts] = useState<ExerciseResponse[]>([]);
+  const [exercises, setExercises] = useState<ExerciseResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [activeTab, setActiveTab] = useState<'MINE' | 'CATALOG'>('CATALOG');
+  
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>('CHEST');
-  const [isPrivate, setIsPrivate] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [exerciseToEdit, setExerciseToEdit] = useState<ExerciseResponse | null>(null);
 
-  const fetchExercises = useCallback(async () => {
+  const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseResponse | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const fetchExercises = useCallback(async (page: number, tab: 'MINE' | 'CATALOG', search: string) => {
+    setLoading(true);
     try {
-      const response = await axiosClient.get('/exercises');
-      setWorkouts(response.data.content ?? []);
+      const isMine = tab === 'MINE';
+      const response = await axiosClient.get(`/exercises?page=${page}&size=20&mineOnly=${isMine}&search=${search}`);
+      setExercises(response.data.content ?? []);
+      setTotalPages(response.data.totalPages ?? 1);
+      setCurrentPage(page);
     } catch (error) {
-      console.error('Error al cargar ejercicios:', error);
       Alert.alert('Error', 'No se pudieron cargar los ejercicios.');
     } finally {
       setLoading(false);
@@ -59,215 +45,196 @@ export default function ExercisesScreen() {
   }, []);
 
   useEffect(() => {
-    fetchExercises();
-  }, [fetchExercises]);
+    fetchExercises(0, activeTab, searchQuery);
+  }, [activeTab]);
 
-  const resetForm = () => {
-    setName('');
-    setDescription('');
-    setMuscleGroup('CHEST');
-    setIsPrivate(true);
-  };
-
-  const closeModal = () => {
-    if (isSaving) return;
-    setIsModalVisible(false);
-  };
-
-  const handleCreateExercise = async () => {
-    // Validamos localmente antes de hacer la petición para ahorrar viajes a K8s
-    if (!name || name.trim().length < 3) {
-      Alert.alert('Validation Error', 'Exercise name must have at least 3 characters.');
-      return;
-    }
-    if (!description || description.trim().length < 10) {
-      Alert.alert('Validation Error', 'Description must have at least 10 characters.');
-      return;
-    }
-
+  const handleSaveExercise = async (payload: CreateExercisePayload, id?: string) => {
     setIsSaving(true);
     try {
-      await axiosClient.post('/exercises', {
-        name, description, muscleGroup, isPrivate,
-      });
+      if (id) {
+        // Modo Edición -> PUT
+        await axiosClient.put(`/exercises/${id}`, payload);
+      } else {
+        // Modo Creación -> POST
+        await axiosClient.post('/exercises', payload);
+      }
       setIsModalVisible(false);
-      resetForm();
-      await fetchExercises();
+      setExerciseToEdit(null);
+      await fetchExercises(0, activeTab, searchQuery);
     } catch (error: any) {
-      console.error('Error completo del servidor:', JSON.stringify(error.response?.data, null, 2));
-      
-      // Como el backend devuelve un 400 por validación fallida, informamos al usuario de forma clara
-      Alert.alert(
-        'Validation Error', 
-        'Please check that your description has at least 10 characters and all fields are filled correctly.'
-      );
+      Alert.alert('Error', 'No se pudo guardar el ejercicio.');
     } finally {
       setIsSaving(false);
     }
   };
+
+  const handleDeleteExercise = async (id: string) => {
+    Alert.alert(
+      "Delete Exercise",
+      "Are you sure you want to delete this exercise? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive", 
+          onPress: async () => {
+            setIsDetailsModalVisible(false);
+            try {
+              await axiosClient.delete(`/exercises/${id}`);
+              await fetchExercises(0, activeTab, searchQuery);
+            } catch (error) {
+              Alert.alert('Error', 'Could not delete the exercise.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleEditExercise = (exercise: ExerciseResponse) => {
+    setIsDetailsModalVisible(false);
+    setExerciseToEdit(exercise);
+    
+    setTimeout(() => {
+      setIsModalVisible(true);
+    }, 300);
+  };
+
+  const openCreateModal = () => {
+    setExerciseToEdit(null);
+    setIsModalVisible(true);
+  };
+
+  const handleOpenDetails = async (id: string) => {
+    setIsDetailsModalVisible(true);
+    setLoadingDetails(true);
+    try {
+      const response = await axiosClient.get(`/exercises/${id}`);
+      setSelectedExercise(response.data);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo cargar la información detallada.');
+      setIsDetailsModalVisible(false);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages - 1) fetchExercises(currentPage + 1, activeTab, searchQuery);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 0) fetchExercises(currentPage - 1, activeTab, searchQuery);
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-black" edges={['top']}>
+      {/* HEADER TABS/SEARCH */}
+      <View className="px-6 mt-4 mb-2">
+        <Text className="text-white text-3xl font-bold">Exercises</Text> 
+        <Text className="text-gray-400 text-base mt-1">Browse and manage</Text>
+      </View>
+
+      <View className="px-6 flex-row mb-5 mt-2">
+        <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveTab('CATALOG')} className={`mr-4 pb-2 border-b-2 ${activeTab === 'CATALOG' ? 'border-white' : 'border-transparent'}`}>
+          <Text className={`text-base font-semibold ${activeTab === 'CATALOG' ? 'text-white' : 'text-gray-500'}`}>Public Catalog</Text>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveTab('MINE')} className={`pb-2 border-b-2 ${activeTab === 'MINE' ? 'border-white' : 'border-transparent'}`}>
+          <Text className={`text-base font-semibold ${activeTab === 'MINE' ? 'text-white' : 'text-gray-500'}`}>My Exercises</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View className="mx-6 mb-4 bg-zinc-900 rounded-2xl px-4 py-4 flex-row items-center border border-zinc-800">
+        <Ionicons name="search-outline" size={18} color="#9ca3af" />
+        <TextInput 
+          placeholder={`Search ${activeTab === 'CATALOG' ? 'catalog' : 'your exercises'}...`} 
+          placeholderTextColor="#9ca3af"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={() => fetchExercises(0, activeTab, searchQuery)}
+          returnKeyType="search"
+          className="text-white text-base ml-3 flex-1"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => { setSearchQuery(''); fetchExercises(0, activeTab, ''); }}>
+             <Ionicons name="close-circle" size={18} color="#9ca3af" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* LISTA DE EJERCICIOS */}
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        <View className="pb-8">
-          <View className="px-6 mt-4 mb-5">
-            <Text className="text-white text-3xl font-bold">Exercises</Text> 
-            <Text className="text-gray-400 text-base mt-1">Browse individual movements</Text>
-          </View>
-
-          <View className="mx-6 mb-5 bg-zinc-900 rounded-2xl px-4 py-4 flex-row items-center border border-zinc-800">
-            <Ionicons name="search-outline" size={18} color="#9ca3af" />
-            <TextInput 
-              placeholder="Search exercises..." 
-              placeholderTextColor="#9ca3af"
-              className="text-white text-base ml-3 flex-1"
-            />
-          </View>
-
-          {loading ? (
-            <ActivityIndicator className="mt-10" color="#ffffff" size="large" />
-          ) : (
-            <View className="px-4 flex-row flex-wrap">
-              {workouts.map((workout) => (
-                <View key={workout.id} className="w-1/2 px-2 mb-4">
-                  <View className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 min-h-[140px] justify-between">
-                    <View>
-                      <View className="flex-row items-center justify-between mb-3">
-                        <View className="bg-zinc-800 rounded-lg px-2 py-1">
-                          <Text className="text-gray-400 text-xs">{workout.muscleGroup}</Text>
-                        </View>
-                        <TouchableOpacity activeOpacity={0.8} className="bg-white rounded-full w-7 h-7 items-center justify-center">
-                          <Ionicons name="add" size={16} color="#000000" />
-                        </TouchableOpacity>
-                      </View>
-                      <Text className="text-white text-base font-semibold mb-1" numberOfLines={2}>
-                        {workout.name}
-                      </Text>
-                    </View>
-                    <Text className="text-gray-500 text-xs mt-2" numberOfLines={2}>
-                      {shortenDescription(workout.description)}
-                    </Text>
-                  </View>
+        {loading ? (
+          <ActivityIndicator className="mt-10" color="#ffffff" size="large" />
+        ) : (
+          <View className="pb-20">
+            {exercises.length === 0 ? (
+                <View className="items-center justify-center mt-10">
+                    <Text className="text-gray-500 text-base">No exercises found.</Text>
                 </View>
-              ))}
-            </View>
-          )}
-        </View>
+            ) : (
+                <View className="px-4 flex-row flex-wrap">
+                {exercises.map((exercise) => (
+                    <TouchableOpacity key={exercise.id} activeOpacity={0.7} className="w-1/2 px-2 mb-4" onPress={() => handleOpenDetails(exercise.id)}>
+                      <View className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 min-h-[140px] justify-between">
+                          <View>
+                          <View className="flex-row items-center justify-between mb-3">
+                              <View className="bg-zinc-800 rounded-lg px-2 py-1">
+                                <Text className="text-gray-400 text-xs">{exercise.muscleGroup}</Text>
+                              </View>
+                              {exercise.exercisePrivate && <Ionicons name="lock-closed" size={14} color="#9ca3af" />}
+                          </View>
+                          <Text className="text-white text-base font-semibold mb-1" numberOfLines={2}>
+                              {exercise.name}
+                          </Text>
+                          </View>
+                          <Text className="text-gray-500 text-xs mt-2" numberOfLines={2}>
+                          {shortenDescription(exercise.description)}
+                          </Text>
+                      </View>
+                    </TouchableOpacity>
+                ))}
+                </View>
+            )}
+
+            {totalPages > 1 && (
+               <View className="flex-row items-center justify-between mx-6 mt-6 mb-8">
+                  <TouchableOpacity onPress={handlePrevPage} disabled={currentPage === 0} className={`px-4 py-2 rounded-lg ${currentPage === 0 ? 'bg-zinc-900' : 'bg-zinc-800'}`}>
+                      <Text className={currentPage === 0 ? 'text-zinc-600' : 'text-white'}>Prev</Text>
+                  </TouchableOpacity>
+                  <Text className="text-gray-400">Page {currentPage + 1} of {totalPages}</Text>
+                  <TouchableOpacity onPress={handleNextPage} disabled={currentPage >= totalPages - 1} className={`px-4 py-2 rounded-lg ${currentPage >= totalPages - 1 ? 'bg-zinc-900' : 'bg-zinc-800'}`}>
+                      <Text className={currentPage >= totalPages - 1 ? 'text-zinc-600' : 'text-white'}>Next</Text>
+                  </TouchableOpacity>
+               </View>
+            )}
+          </View>
+        )}
       </ScrollView>
 
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => setIsModalVisible(true)}
-        className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-white items-center justify-center"
-      >
+      {/* FAB */}
+      <TouchableOpacity activeOpacity={0.85} onPress={openCreateModal} className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-white items-center justify-center shadow-lg">
         <Ionicons name="add" size={28} color="#000000" />
       </TouchableOpacity>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isModalVisible}
-        onRequestClose={closeModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          className="flex-1 justify-end"
-        >
-          <Pressable className="absolute inset-0 bg-black/70" onPress={closeModal} />
+      {/* MODALS */}
+      <ExerciseDetailsModal 
+        isVisible={isDetailsModalVisible} 
+        onClose={() => setIsDetailsModalVisible(false)} 
+        exercise={selectedExercise} 
+        loading={loadingDetails} 
+        onDelete={handleDeleteExercise}
+        onEdit={handleEditExercise}
+      />
+      
+      <CreateExerciseModal 
+        isVisible={isModalVisible} 
+        onClose={() => setIsModalVisible(false)} 
+        onSave={handleSaveExercise} 
+        isSaving={isSaving} 
+        initialData={exerciseToEdit}
+      />
 
-          <View className="bg-zinc-900 rounded-t-3xl px-6 pt-3 pb-10">
-            <View className="items-center mb-6">
-              <View className="w-12 h-1.5 rounded-full bg-zinc-600" />
-            </View>
-
-            <Text className="text-white text-2xl font-bold mb-6">
-              Create exercise
-            </Text>
-
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Exercise name..."
-              placeholderTextColor="#6b7280"
-              className="bg-black text-white border border-zinc-800 rounded-xl px-4 py-3 mb-4"
-            />
-
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Description..."
-              placeholderTextColor="#6b7280"
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              className="bg-black text-white border border-zinc-800 rounded-xl px-4 py-3 mb-4 h-28"
-            />
-
-            <Text className="text-gray-400 text-sm font-medium mb-3">
-              Muscle group
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="mb-6"
-            >
-              <View className="flex-row">
-                {MUSCLE_GROUPS.map((group) =>
-                  muscleGroup === group ? (
-                    <TouchableOpacity
-                      key={group}
-                      activeOpacity={0.8}
-                      onPress={() => setMuscleGroup(group)}
-                      className="rounded-full px-4 py-2 mr-2 bg-white"
-                    >
-                      <Text className="text-sm font-medium text-black">
-                        {group}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      key={group}
-                      activeOpacity={0.8}
-                      onPress={() => setMuscleGroup(group)}
-                      className="rounded-full px-4 py-2 mr-2 bg-zinc-800"
-                    >
-                      <Text className="text-sm font-medium text-gray-400">
-                        {group}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                )}
-              </View>
-            </ScrollView>
-
-            <View className="flex-row items-center justify-between mb-8">
-              <Text className="text-gray-400 flex-1 mr-4">
-                Private exercise (Only you can see it)
-              </Text>
-              <Switch
-                value={isPrivate}
-                onValueChange={setIsPrivate}
-                trackColor={{ false: '#3f3f46', true: '#ffffff' }}
-                thumbColor={isPrivate ? '#000000' : '#a1a1aa'}
-              />
-            </View>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleCreateExercise}
-              disabled={isSaving}
-              className="bg-white rounded-xl py-4 flex-row items-center justify-center"
-            >
-              {isSaving ? (
-                <ActivityIndicator color="#000000" />
-              ) : (
-                <Text className="text-black text-base font-semibold">
-                  Save Exercise
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </SafeAreaView>
   );
 }
