@@ -1,21 +1,25 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-export type ExerciseSummaryDto = {
-  id: string;
+export type EnrichedWorkoutExerciseDto = {
+  exerciseId: string;
   name: string;
   description: string;
   muscleGroup: string;
+  targetSets: number;
+  targetReps: number;
+  restTimeSeconds: number;
+  orderIndex: number;
 };
 
 export type WorkoutDetailResponse = {
   id: string;
   name: string;
-  exercises: ExerciseSummaryDto[];
   workoutPrivate: boolean;
   createdBy: string;
   createdAt: string;
   workoutOwner: boolean;
+  enrichedWorkoutExercises: EnrichedWorkoutExerciseDto[];
 };
 
 interface RoutineDetailsProps {
@@ -28,6 +32,8 @@ interface RoutineDetailsProps {
 }
 
 export default function RoutineDetailsModal({ isVisible, onClose, workout, loading, onDelete, onEdit }: RoutineDetailsProps) {
+  const exercises = workout?.enrichedWorkoutExercises ?? [];
+
   return (
     <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
       <View className="flex-1 justify-end">
@@ -63,22 +69,31 @@ export default function RoutineDetailsModal({ isVisible, onClose, workout, loadi
 
               <Text className="text-white text-3xl font-bold mb-6">{workout.name}</Text>
               <Text className="text-white text-lg font-semibold mb-4">
-                Exercises ({workout.exercises?.length || 0})
+                Exercises ({exercises.length})
               </Text>
 
               <ScrollView showsVerticalScrollIndicator={false} className="flex-1 mb-4">
-                {!workout.exercises || workout.exercises.length === 0 ? (
+                {exercises.length === 0 ? (
                   <Text className="text-gray-500 italic mt-2">No exercises added to this routine yet.</Text>
                 ) : (
-                  workout.exercises.map((ex: ExerciseSummaryDto, index: number) => (
-                    <View key={`${ex.id}-${index}`} className="bg-zinc-800/50 rounded-xl p-4 mb-3 border border-zinc-800/80">
+                  exercises.map((ex, index) => (
+                    <View key={`${ex.exerciseId}-${index}`} className="bg-zinc-800/50 rounded-xl p-4 mb-3 border border-zinc-800/80">
                       <View className="flex-row items-center justify-between mb-1">
-                        <Text className="text-white text-base font-semibold">{ex.name}</Text>
-                        <Text className="text-xs text-gray-500 bg-zinc-800 px-2 py-1 rounded">{ex.muscleGroup}</Text>
+                        <Text className="text-white text-base font-semibold">{ex.name || 'Exercise'}</Text>
+                        {ex.muscleGroup ? (
+                          <Text className="text-xs text-gray-500 bg-zinc-800 px-2 py-1 rounded">{ex.muscleGroup}</Text>
+                        ) : null}
                       </View>
+
                       {ex.description ? (
-                        <Text className="text-gray-400 text-xs mt-1" numberOfLines={2}>{ex.description}</Text>
+                        <Text className="text-gray-400 text-xs mb-2" numberOfLines={2}>{ex.description}</Text>
                       ) : null}
+
+                      <View className="flex-row gap-4 mt-2 pt-2 border-t border-zinc-700/50">
+                        <Text className="text-zinc-400 text-xs">Sets: <Text className="text-white font-bold">{ex.targetSets ?? 0}</Text></Text>
+                        <Text className="text-zinc-400 text-xs">Reps: <Text className="text-white font-bold">{ex.targetReps ?? 0}</Text></Text>
+                        <Text className="text-zinc-400 text-xs">Rest: <Text className="text-white font-bold">{ex.restTimeSeconds ?? 0}s</Text></Text>
+                      </View>
                     </View>
                   ))
                 )}
@@ -94,7 +109,6 @@ export default function RoutineDetailsModal({ isVisible, onClose, workout, loadi
                   <Text className="text-white text-base font-semibold">Close</Text>
                 </TouchableOpacity>
 
-                {/* Botones Edit/Delete */}
                 {workout.workoutOwner && (
                   <>
                     {onEdit && (

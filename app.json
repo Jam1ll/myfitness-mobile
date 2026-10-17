@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.jamil0877.myfitnessmobile"
+      "package": "com.jamil0877.myfitnessmobile",
+      "usesCleartextTraffic": true
     },
     "web": {
       "output": "static",
