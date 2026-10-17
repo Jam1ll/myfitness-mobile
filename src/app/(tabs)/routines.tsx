@@ -102,7 +102,6 @@ export default function RoutinesScreen() {
     setIsDetailsModalVisible(false);
     setWorkoutToEdit(workout);
     
-    // Timeout breve para esperar que el modal de detalles se cierre visualmente
     setTimeout(() => {
       setIsModalVisible(true);
     }, 300);

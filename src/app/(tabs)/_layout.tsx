@@ -22,7 +22,7 @@ export default function TabsLayout() {
         },
       }}
     >
-      {/* 1. DASHBOARD PRINCIPAL */}
+      {/* DASHBOARD PRINCIPAL */}
       <Tabs.Screen
         name="home"
         options={{
@@ -32,7 +32,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* 2. LIBRERÍA DE EJERCICIOS */}
+      {/* LIBRERÍA DE EJERCICIOS */}
       <Tabs.Screen
         name="exercises"
         options={{
@@ -42,7 +42,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* 3. EXPLORADOR DE RUTINAS */}
+      {/* EXPLORADOR DE RUTINAS */}
       <Tabs.Screen
         name="routines"
         options={{
@@ -52,7 +52,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* 4. CONFIGURACIÓN / CUENTA */}
+      {/* CONFIGURACIÓN / CUENTA */}
       <Tabs.Screen
         name="account"
         options={{
