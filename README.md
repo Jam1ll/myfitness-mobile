@@ -1,4 +1,3 @@
-String readmeMarkdown = """
 # MyFitness Mobile
 
 A modern, cross-platform mobile application for managing fitness routines and exercises. Built with React Native and Expo, this app serves as the frontend client for the MyFitness microservices ecosystem.
@@ -83,4 +82,3 @@ Before you begin, ensure you have met the following requirements:
 ## License
 
 This project is open-source and available under the [MIT License](LICENSE).
-""";
