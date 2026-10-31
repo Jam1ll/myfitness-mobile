@@ -1,3 +1,4 @@
+import { Colors } from '@/theme/colors';
 import CreateExerciseModal, { CreateExercisePayload } from '@/features/catalog/components/CreateExerciseModal';
 import ExerciseDetailsModal, { ExerciseResponse } from '@/features/catalog/components/ExerciseDetailsModal';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -128,36 +129,36 @@ export default function ExercisesScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-black" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-brand-background" edges={['top']}>
       {/* HEADER TABS/SEARCH */}
       <View className="px-6 mt-4 mb-2">
-        <Text className="text-white text-3xl font-bold">Exercises</Text> 
-        <Text className="text-gray-400 text-base mt-1">Browse and manage</Text>
+        <Text className="text-brand-primary text-3xl font-bold">Exercises</Text> 
+        <Text className="text-content-secondary text-base mt-1">Browse and manage</Text>
       </View>
 
       <View className="px-6 flex-row mb-5 mt-2">
-        <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveTab('CATALOG')} className={`mr-4 pb-2 border-b-2 ${activeTab === 'CATALOG' ? 'border-white' : 'border-transparent'}`}>
-          <Text className={`text-base font-semibold ${activeTab === 'CATALOG' ? 'text-white' : 'text-gray-500'}`}>Public Catalog</Text>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveTab('CATALOG')} className={`mr-4 pb-2 border-b-2 ${activeTab === 'CATALOG' ? 'border-brand-primary' : 'border-transparent'}`}>
+          <Text className={`text-base font-semibold ${activeTab === 'CATALOG' ? 'text-brand-primary' : 'text-content-tertiary'}`}>Public Catalog</Text>
         </TouchableOpacity>
-        <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveTab('MINE')} className={`pb-2 border-b-2 ${activeTab === 'MINE' ? 'border-white' : 'border-transparent'}`}>
-          <Text className={`text-base font-semibold ${activeTab === 'MINE' ? 'text-white' : 'text-gray-500'}`}>My Exercises</Text>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveTab('MINE')} className={`pb-2 border-b-2 ${activeTab === 'MINE' ? 'border-brand-primary' : 'border-transparent'}`}>
+          <Text className={`text-base font-semibold ${activeTab === 'MINE' ? 'text-brand-primary' : 'text-content-tertiary'}`}>My Exercises</Text>
         </TouchableOpacity>
       </View>
 
-      <View className="mx-6 mb-4 bg-zinc-900 rounded-2xl px-4 py-4 flex-row items-center border border-zinc-800">
-        <Ionicons name="search-outline" size={18} color="#9ca3af" />
+      <View className="mx-6 mb-4 bg-brand-surface rounded-2xl px-4 py-4 flex-row items-center border border-brand-surfaceBorder">
+        <Ionicons name="search-outline" size={18} color={Colors.content.secondary} />
         <TextInput 
           placeholder={`Search ${activeTab === 'CATALOG' ? 'catalog' : 'your exercises'}...`} 
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={Colors.content.secondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={() => fetchExercises(0, activeTab, searchQuery)}
           returnKeyType="search"
-          className="text-white text-base ml-3 flex-1"
+          className="text-brand-primary text-base ml-3 flex-1"
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => { setSearchQuery(''); fetchExercises(0, activeTab, ''); }}>
-             <Ionicons name="close-circle" size={18} color="#9ca3af" />
+             <Ionicons name="close-circle" size={18} color={Colors.content.secondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -165,30 +166,30 @@ export default function ExercisesScreen() {
       {/* LISTA DE EJERCICIOS */}
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {loading ? (
-          <ActivityIndicator className="mt-10" color="#ffffff" size="large" />
+          <ActivityIndicator className="mt-10" color={Colors.brand.primary} size="large" />
         ) : (
           <View className="pb-20">
             {exercises.length === 0 ? (
                 <View className="items-center justify-center mt-10">
-                    <Text className="text-gray-500 text-base">No exercises found.</Text>
+                    <Text className="text-content-tertiary text-base">No exercises found.</Text>
                 </View>
             ) : (
                 <View className="px-4 flex-row flex-wrap">
                 {exercises.map((exercise) => (
                     <TouchableOpacity key={exercise.id} activeOpacity={0.7} className="w-1/2 px-2 mb-4" onPress={() => handleOpenDetails(exercise.id)}>
-                      <View className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 min-h-[140px] justify-between">
+                      <View className="bg-brand-surface rounded-2xl p-4 border border-brand-surfaceBorder min-h-[140px] justify-between">
                           <View>
                           <View className="flex-row items-center justify-between mb-3">
-                              <View className="bg-zinc-800 rounded-lg px-2 py-1">
-                                <Text className="text-gray-400 text-xs">{exercise.muscleGroup}</Text>
+                              <View className="bg-brand-surfaceAlt rounded-lg px-2 py-1">
+                                <Text className="text-content-secondary text-xs">{exercise.muscleGroup}</Text>
                               </View>
-                              {exercise.exercisePrivate && <Ionicons name="lock-closed" size={14} color="#9ca3af" />}
+                              {exercise.exercisePrivate && <Ionicons name="lock-closed" size={14} color={Colors.content.secondary} />}
                           </View>
-                          <Text className="text-white text-base font-semibold mb-1" numberOfLines={2}>
+                          <Text className="text-brand-primary text-base font-semibold mb-1" numberOfLines={2}>
                               {exercise.name}
                           </Text>
                           </View>
-                          <Text className="text-gray-500 text-xs mt-2" numberOfLines={2}>
+                          <Text className="text-content-tertiary text-xs mt-2" numberOfLines={2}>
                           {shortenDescription(exercise.description)}
                           </Text>
                       </View>
@@ -199,12 +200,12 @@ export default function ExercisesScreen() {
 
             {totalPages > 1 && (
                <View className="flex-row items-center justify-between mx-6 mt-6 mb-8">
-                  <TouchableOpacity onPress={handlePrevPage} disabled={currentPage === 0} className={`px-4 py-2 rounded-lg ${currentPage === 0 ? 'bg-zinc-900' : 'bg-zinc-800'}`}>
-                      <Text className={currentPage === 0 ? 'text-zinc-600' : 'text-white'}>Prev</Text>
+                  <TouchableOpacity onPress={handlePrevPage} disabled={currentPage === 0} className={`px-4 py-2 rounded-lg ${currentPage === 0 ? 'bg-brand-surface' : 'bg-brand-surfaceAlt'}`}>
+                      <Text className={currentPage === 0 ? 'text-content-disabled' : 'text-brand-primary'}>Prev</Text>
                   </TouchableOpacity>
-                  <Text className="text-gray-400">Page {currentPage + 1} of {totalPages}</Text>
-                  <TouchableOpacity onPress={handleNextPage} disabled={currentPage >= totalPages - 1} className={`px-4 py-2 rounded-lg ${currentPage >= totalPages - 1 ? 'bg-zinc-900' : 'bg-zinc-800'}`}>
-                      <Text className={currentPage >= totalPages - 1 ? 'text-zinc-600' : 'text-white'}>Next</Text>
+                  <Text className="text-content-secondary">Page {currentPage + 1} of {totalPages}</Text>
+                  <TouchableOpacity onPress={handleNextPage} disabled={currentPage >= totalPages - 1} className={`px-4 py-2 rounded-lg ${currentPage >= totalPages - 1 ? 'bg-brand-surface' : 'bg-brand-surfaceAlt'}`}>
+                      <Text className={currentPage >= totalPages - 1 ? 'text-content-disabled' : 'text-brand-primary'}>Next</Text>
                   </TouchableOpacity>
                </View>
             )}
@@ -213,8 +214,8 @@ export default function ExercisesScreen() {
       </ScrollView>
 
       {/* FAB */}
-      <TouchableOpacity activeOpacity={0.85} onPress={openCreateModal} className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-white items-center justify-center shadow-lg">
-        <Ionicons name="add" size={28} color="#000000" />
+      <TouchableOpacity activeOpacity={0.85} onPress={openCreateModal} className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-brand-primary items-center justify-center shadow-lg">
+        <Ionicons name="add" size={28} color={Colors.brand.background} />
       </TouchableOpacity>
 
       {/* MODALS */}

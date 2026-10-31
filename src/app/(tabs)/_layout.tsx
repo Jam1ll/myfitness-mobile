@@ -1,3 +1,4 @@
+import { Colors } from '@/theme/colors';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 
@@ -6,11 +7,11 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#ffffff',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarActiveTintColor: Colors.brand.primary,
+        tabBarInactiveTintColor: Colors.content.tertiary,
         tabBarStyle: {
-          backgroundColor: '#000000',
-          borderTopColor: '#1f1f1f',
+          backgroundColor: Colors.brand.background,
+          borderTopColor: Colors.brand.surfaceBorder,
           borderTopWidth: 1,
         },
         tabBarLabelStyle: {
@@ -18,7 +19,7 @@ export default function TabsLayout() {
           fontWeight: '600',
         },
         sceneStyle: {
-          backgroundColor: '#000000',
+          backgroundColor: Colors.brand.background,
         },
       }}
     >
@@ -49,6 +50,16 @@ export default function TabsLayout() {
           title: 'Routines',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="search-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      {/* PROGRAMAS SEMANALES */}
+      <Tabs.Screen
+        name="programs"
+        options={{
+          title: 'Programs',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" size={size} color={color} />
           ),
         }}
       />

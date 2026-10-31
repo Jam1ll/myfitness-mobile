@@ -1,3 +1,4 @@
+import { Colors } from '@/theme/colors';
 import {
   GoogleSignin,
   statusCodes,
@@ -67,19 +68,19 @@ export default function LoginScreen() {
   };
 
   return (
-    <View className="flex-1 bg-black justify-center items-center px-8">
-      <Text className="text-5xl font-bold text-white mb-4 tracking-widest">
+    <View className="flex-1 bg-brand-background justify-center items-center px-8">
+      <Text className="text-5xl font-bold text-brand-primary mb-4 tracking-widest">
         MyFitness
       </Text>
-      <Text className="text-lg text-gray-400 mb-12 text-center">
+      <Text className="text-lg text-content-secondary mb-12 text-center">
         Give your best today.
       </Text>
       
       <TouchableOpacity
         onPress={signInWithGoogle}
-        className="w-full py-4 bg-white rounded-xl flex-row justify-center items-center active:opacity-80"
+        className="w-full py-4 bg-brand-primary rounded-xl flex-row justify-center items-center active:opacity-80"
       >
-        <Text className="text-black text-lg font-semibold tracking-wide">
+        <Text className="text-brand-background text-lg font-semibold tracking-wide">
           Continue with Google
         </Text>
       </TouchableOpacity>

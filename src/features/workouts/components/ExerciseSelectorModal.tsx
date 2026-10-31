@@ -1,4 +1,5 @@
 import { axiosClient } from '@/api/axiosClient';
+import { Colors } from '@/theme/colors';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
@@ -47,17 +48,17 @@ export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, i
   return (
     <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-black/80" onPress={onClose} />
+        <Pressable className="absolute inset-0 bg-brand-background/80" onPress={onClose} />
         
-        <View className="bg-zinc-900 rounded-t-3xl px-6 pt-3 pb-10 min-h-[70%] max-h-[90%]">
+        <View className="bg-brand-surface rounded-t-3xl px-6 pt-3 pb-10 min-h-[70%] max-h-[90%]">
           <View className="items-center mb-6">
-            <View className="w-12 h-1.5 rounded-full bg-zinc-600" />
+            <View className="w-12 h-1.5 rounded-full bg-brand-muted" />
           </View>
 
-          <Text className="text-white text-2xl font-bold mb-6">Select Exercises</Text>
+          <Text className="text-brand-primary text-2xl font-bold mb-6">Select Exercises</Text>
 
           {loading ? (
-            <ActivityIndicator color="#ffffff" size="large" className="mt-10" />
+            <ActivityIndicator color={Colors.brand.primary} size="large" className="mt-10" />
           ) : (
             <FlatList
               data={exercises}
@@ -69,13 +70,13 @@ export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, i
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => toggleExercise(item.id)}
-                    className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border ${isSelected ? 'bg-zinc-800 border-white' : 'bg-black border-zinc-800'}`}
+                    className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border ${isSelected ? 'bg-brand-surfaceAlt border-brand-primary' : 'bg-brand-background border-brand-surfaceBorder'}`}
                   >
                     <View>
-                      <Text className="text-white font-semibold text-base">{item.name}</Text>
-                      <Text className="text-gray-500 text-xs">{item.muscleGroup}</Text>
+                      <Text className="text-brand-primary font-semibold text-base">{item.name}</Text>
+                      <Text className="text-content-tertiary text-xs">{item.muscleGroup}</Text>
                     </View>
-                    {isSelected && <Ionicons name="checkmark-circle" size={24} color="#ffffff" />}
+                    {isSelected && <Ionicons name="checkmark-circle" size={24} color={Colors.brand.primary} />}
                   </TouchableOpacity>
                 );
               }}
@@ -85,9 +86,9 @@ export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, i
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => { onConfirm(selectedIds); onClose(); }}
-            className="bg-white rounded-xl py-4 flex-row items-center justify-center mt-4"
+            className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center mt-4"
           >
-            <Text className="text-black text-base font-semibold">Confirm ({selectedIds.length})</Text>
+            <Text className="text-brand-background text-base font-semibold">Confirm ({selectedIds.length})</Text>
           </TouchableOpacity>
         </View>
       </View>
