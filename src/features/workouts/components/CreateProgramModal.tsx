@@ -1,4 +1,4 @@
-import { axiosClient } from '@/api/axiosClient';
+import { workoutApi } from '@/api/workoutApi';
 import type {
   CreateWeeklyProgramRequest,
   DayOfWeek,
@@ -8,7 +8,8 @@ import type {
 } from '@/features/workouts/types';
 import { Colors } from '@/theme/colors';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -53,6 +54,8 @@ export default function CreateProgramModal({
   onSaved,
   initialData,
 }: CreateProgramModalProps) {
+  const queryClient = useQueryClient();
+
   const [name, setName] = useState('');
   const [weeklyProgramActive, setWeeklyProgramActive] = useState(false);
   const [dayAssignments, setDayAssignments] = useState<Record<DayOfWeek, string | null>>({
@@ -65,35 +68,57 @@ export default function CreateProgramModal({
     SUNDAY: null,
   });
 
-  const [routineOptions, setRoutineOptions] = useState<RoutineOption[]>([]);
-  const [loadingRoutines, setLoadingRoutines] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
   // The day currently showing the routine picker
   const [pickingDay, setPickingDay] = useState<DayOfWeek | null>(null);
 
-  // ── Load user routines when modal opens ─────────────────────────────────
+  // ── Queries ───────────────────────────────────────────────────────────────
 
-  const fetchUserRoutines = async () => {
-    setLoadingRoutines(true);
-    try {
-      const response = await axiosClient.get('/workouts/routines?page=0&size=100&mineOnly=false&search=');
-      const items = (response.data.content ?? []).map((r: any) => ({
-        id: r.id,
-        name: r.name,
-      }));
-      setRoutineOptions(items);
-    } catch {
-      Alert.alert('Error', 'Could not load your routines.');
-    } finally {
-      setLoadingRoutines(false);
-    }
-  };
+  const { data: routinesPage, isLoading: loadingRoutines } = useQuery({
+    queryKey: ['routines', 'all'],
+    queryFn: () => workoutApi.getRoutines({ page: 0, size: 100, mineOnly: false, search: '' }),
+    enabled: isVisible,
+  });
+
+  const routineOptions = useMemo<RoutineOption[]>(() => {
+    return (routinesPage?.content ?? []).map((r) => ({
+      id: r.id,
+      name: r.name,
+    }));
+  }, [routinesPage]);
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
+
+  const saveProgramMutation = useMutation({
+    mutationFn: async ({
+      id,
+      payload,
+    }: {
+      id?: string;
+      payload: CreateWeeklyProgramRequest | UpdateWeeklyProgramRequest;
+    }) => {
+      if (id) {
+        return workoutApi.updateProgram(id, payload as UpdateWeeklyProgramRequest);
+      }
+      return workoutApi.createProgram(payload as CreateWeeklyProgramRequest);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['programs'] });
+      queryClient.invalidateQueries({ queryKey: ['programs', 'active'] });
+      onSaved();
+      onClose();
+    },
+    onError: (error) => {
+      console.error('Error saving program:', error);
+      Alert.alert('Error', 'Could not save the program. Check the Expo console for details.');
+    },
+  });
+
+  // ── Sync form when modal opens or initialData changes ─────────────────────
 
   useEffect(() => {
-    if (isVisible) {
-      fetchUserRoutines();
+    if (!isVisible) return;
 
+    queueMicrotask(() => {
       if (initialData) {
         setName(initialData.name);
         setWeeklyProgramActive(initialData.weeklyProgramActive ?? false);
@@ -123,7 +148,7 @@ export default function CreateProgramModal({
           SUNDAY: null,
         });
       }
-    }
+    });
   }, [isVisible, initialData]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
@@ -133,7 +158,7 @@ export default function CreateProgramModal({
     setPickingDay(null);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter a program name.');
       return;
@@ -151,28 +176,23 @@ export default function CreateProgramModal({
       return;
     }
 
-    setIsSaving(true);
-    try {
-      if (initialData) {
-        const updatePayload: UpdateWeeklyProgramRequest = {
+    if (initialData) {
+      saveProgramMutation.mutate({
+        id: initialData.id,
+        payload: {
           name: name.trim(),
           programDays,
           weeklyProgramActive,
-        };
-        await axiosClient.put(`/workouts/programs/${initialData.id}`, updatePayload);
-      } else {
-        const createPayload: CreateWeeklyProgramRequest = {
+        },
+      });
+    } else {
+      saveProgramMutation.mutate({
+        payload: {
           name: name.trim(),
           programDays,
-        };
-        await axiosClient.post('/workouts/programs', createPayload);
-      }
-      onSaved();
-      onClose();
-    } catch {
-      Alert.alert('Error', 'Could not save the program. Check the Expo console for details.');
-    } finally {
-      setIsSaving(false);
+          weeklyProgramActive: false,
+        },
+      });
     }
   };
 
@@ -303,12 +323,14 @@ export default function CreateProgramModal({
                                 key={routine.id}
                                 activeOpacity={0.7}
                                 onPress={() => assignRoutineToDay(value, routine.id)}
-                                className={`flex-row items-center justify-between p-3 rounded-lg mb-1 ${isSelected ? 'bg-brand-primary/10' : ''
-                                  }`}
+                                className={`flex-row items-center justify-between p-3 rounded-lg mb-1 ${
+                                  isSelected ? 'bg-brand-primary/10' : ''
+                                }`}
                               >
                                 <Text
-                                  className={`text-sm font-medium ${isSelected ? 'text-brand-primary' : 'text-content-secondary'
-                                    }`}
+                                  className={`text-sm font-medium ${
+                                    isSelected ? 'text-brand-primary' : 'text-content-secondary'
+                                  }`}
                                   numberOfLines={1}
                                 >
                                   {routine.name}
@@ -332,10 +354,10 @@ export default function CreateProgramModal({
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleSubmit}
-            disabled={isSaving}
+            disabled={saveProgramMutation.isPending}
             className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center mt-4"
           >
-            {isSaving ? (
+            {saveProgramMutation.isPending ? (
               <ActivityIndicator color={Colors.brand.background} size="small" />
             ) : (
               <Text className="text-brand-background text-base font-semibold">

@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.0.5:8080/api/v1';
 
-// Caché en memoria para acceso instantáneo
 let memoryToken: string | null = null;
 
 export const setAuthToken = async (token: string | null) => {
@@ -35,7 +34,6 @@ export const axiosClient = axios.create({
 // Request interceptor
 axiosClient.interceptors.request.use(
   async (config) => {
-    // Si la memoria está vacía (ej. abriste la app recién), lo busca en el disco
     if (!memoryToken) {
       if (Platform.OS === 'web') {
         memoryToken = localStorage.getItem('jwt_token');
@@ -43,9 +41,9 @@ axiosClient.interceptors.request.use(
         memoryToken = await SecureStore.getItemAsync('jwt_token');
       }
     }
-    
+
     console.log(`[Axios] Petición a ${config.url} | Token:`, memoryToken ? `${memoryToken.substring(0, 15)}...` : 'NULO');
-    
+
     if (memoryToken && config.headers) {
       config.headers.Authorization = `Bearer ${memoryToken}`;
     }

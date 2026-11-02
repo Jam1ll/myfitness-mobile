@@ -1,11 +1,13 @@
+import { workoutApi } from '@/api/workoutApi';
+import type { DayOfWeek, RoutineSummary } from '@/features/workouts/types';
 import { Colors } from '@/theme/colors';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   ScrollView,
   Text,
@@ -13,21 +15,30 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { axiosClient } from '../../api/axiosClient';
-
-// ─── Types ──────────────────────────────────────────────────────────────────────
-
-type RoutineSummary = {
-  id: string;
-  name: string;
-  routinePrivate: boolean;
-  createdBy: string;
-  createdAt: string;
-};
 
 // ─── Weekly day helpers ─────────────────────────────────────────────────────────
 
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
+const INDEX_TO_DAY_OF_WEEK: Record<number, DayOfWeek> = {
+  0: 'MONDAY',
+  1: 'TUESDAY',
+  2: 'WEDNESDAY',
+  3: 'THURSDAY',
+  4: 'FRIDAY',
+  5: 'SATURDAY',
+  6: 'SUNDAY',
+};
+
+const DAY_OF_WEEK_TO_INDEX: Record<DayOfWeek, number> = {
+  MONDAY: 0,
+  TUESDAY: 1,
+  WEDNESDAY: 2,
+  THURSDAY: 3,
+  FRIDAY: 4,
+  SATURDAY: 5,
+  SUNDAY: 6,
+};
 
 /** JS getDay() is 0=Sun … 6=Sat → remap to 0=Mon … 6=Sun */
 function todayIndex(): number {
@@ -35,58 +46,127 @@ function todayIndex(): number {
   return d === 0 ? 6 : d - 1;
 }
 
-/** Mock: indices (0-based Mon–Sun) that have a scheduled workout dot. */
-const MOCK_SCHEDULED_DAYS = new Set([0, 2, 4]); // Mon, Wed, Fri
-
 // ─── Component ──────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [routines, setRoutines] = useState<RoutineSummary[]>([]);
-  const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
 
-  // Mock state: toggle to `false` to preview the rest-day card
-  const [hasWorkoutToday] = useState(false);
-
-  // ── Data fetching ──────────────────────────────────────────────────────────
-
-  const loadUserData = useCallback(async () => {
-    try {
-      let name: string | null = null;
-      if (Platform.OS === 'web') {
-        name = localStorage.getItem('user_name');
-      } else {
-        name = await SecureStore.getItemAsync('user_name');
-      }
-      if (name) setUserName(name);
-    } catch (error) {
-      console.error('Error loading user name:', error);
-    }
-  }, []);
-
-  const fetchWorkouts = useCallback(async () => {
-    try {
-      const response = await axiosClient.get('/workouts/routines', {
-        params: { page: 0, size: 5, mineOnly: true },
-      });
-      setRoutines(response.data.content ?? []);
-    } catch (error) {
-      console.error('Error fetching routines:', error);
-      Alert.alert('Error', 'Your routines could not be fetched.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // ── User Data (Local auth info) ───────────────────────────────────────────
 
   useEffect(() => {
-    loadUserData();
-    fetchWorkouts();
-  }, [loadUserData, fetchWorkouts]);
+    let isMounted = true;
+    (async () => {
+      try {
+        let name: string | null = null;
+        if (Platform.OS === 'web') {
+          name = localStorage.getItem('user_name');
+        } else {
+          name = await SecureStore.getItemAsync('user_name');
+        }
+        if (isMounted && name) {
+          setUserName(name);
+        }
+      } catch (error) {
+        console.error('Error loading user name:', error);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // ── Queries ───────────────────────────────────────────────────────────────
+
+  // Query: User's personal routines
+  const { data: routinesPage, isLoading: isLoadingRoutines } = useQuery({
+    queryKey: ['routines', 'mine'],
+    queryFn: () => workoutApi.getRoutines({ page: 0, size: 5, mineOnly: true }),
+  });
+  const routines = useMemo<RoutineSummary[]>(() => routinesPage?.content ?? [], [routinesPage]);
+
+  // Query: Active weekly program
+  const { data: activeProgram, isLoading: isLoadingProgram } = useQuery({
+    queryKey: ['programs', 'active'],
+    queryFn: async () => {
+      try {
+        const directRes = await workoutApi.getActiveProgram();
+        if (directRes && directRes.weeklyProgramActive !== false) {
+          return directRes;
+        }
+      } catch {
+        // Fallback: search all user programs
+        const list = await workoutApi.getPrograms();
+        return list.find((p) => p.weeklyProgramActive) ?? null;
+      }
+      return null;
+    },
+  });
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
   const currentDayIdx = useMemo(() => todayIndex(), []);
+  const todayDayOfWeek = useMemo<DayOfWeek>(() => INDEX_TO_DAY_OF_WEEK[currentDayIdx], [currentDayIdx]);
+
+  // Dynamic set of 0-based indices that have a routine assigned
+  const scheduledDays = useMemo(() => {
+    const daysSet = new Set<number>();
+    if (!activeProgram?.programDays) return daysSet;
+
+    activeProgram.programDays.forEach((pd) => {
+      if (pd.routineId) {
+        const idx = DAY_OF_WEEK_TO_INDEX[pd.dayOfWeek];
+        if (idx !== undefined) {
+          daysSet.add(idx);
+        }
+      }
+    });
+
+    return daysSet;
+  }, [activeProgram]);
+
+  // Today's assigned program day
+  const todayProgramDay = useMemo(() => {
+    if (!activeProgram?.programDays) return null;
+    return (
+      activeProgram.programDays.find(
+        (pd) => pd.dayOfWeek === todayDayOfWeek && Boolean(pd.routineId),
+      ) ?? null
+    );
+  }, [activeProgram, todayDayOfWeek]);
+
+  const hasWorkoutToday = Boolean(todayProgramDay?.routineId);
+  const todayRoutineId = todayProgramDay?.routineId;
+
+  // Query: Today's routine detail (only runs if a routine is scheduled today)
+  const { data: todayRoutineDetailData } = useQuery({
+    queryKey: ['routines', 'detail', todayRoutineId],
+    queryFn: () => workoutApi.getRoutineById(todayRoutineId!),
+    enabled: Boolean(todayRoutineId),
+  });
+
+  const todayRoutineDetail = useMemo(() => {
+    if (!todayRoutineId) return null;
+    const fallbackName = todayProgramDay?.routineName || 'Today Workout';
+
+    if (todayRoutineDetailData) {
+      const exercises = todayRoutineDetailData.enrichedRoutineExercises ?? [];
+      const count = exercises.length;
+      const estimatedMins = count > 0 ? Math.max(20, count * 7) : undefined;
+      return {
+        name: todayRoutineDetailData.name || fallbackName,
+        exerciseCount: count,
+        estimatedMinutes: estimatedMins,
+      };
+    }
+
+    const routineFromList = routines.find((r) => r.id === todayRoutineId);
+    return {
+      name: routineFromList?.name || fallbackName,
+    };
+  }, [todayRoutineId, todayRoutineDetailData, todayProgramDay?.routineName, routines]);
+
   const firstRoutine = routines[0] ?? null;
   const remainingRoutines = routines.slice(1);
 
@@ -100,21 +180,24 @@ export default function HomeScreen() {
         return (
           <View key={label} className="items-center flex-1">
             <View
-              className={`w-10 h-10 rounded-full items-center justify-center ${isToday ? 'bg-brand-primary' : 'bg-brand-surfaceAlt'
-                }`}
+              className={`w-10 h-10 rounded-full items-center justify-center ${
+                isToday ? 'bg-brand-primary' : 'bg-brand-surfaceAlt'
+              }`}
             >
               <Text
-                className={`text-xs font-semibold ${isToday ? 'text-brand-background' : 'text-content-secondary'
-                  }`}
+                className={`text-xs font-semibold ${
+                  isToday ? 'text-brand-background' : 'text-content-secondary'
+                }`}
               >
                 {label}
               </Text>
             </View>
             {/* Scheduled-workout dot indicator */}
-            {MOCK_SCHEDULED_DAYS.has(idx) && (
+            {scheduledDays.has(idx) && (
               <View
-                className={`w-1.5 h-1.5 rounded-full mt-1.5 ${isToday ? 'bg-brand-primary' : 'bg-content-tertiary'
-                  }`}
+                className={`w-1.5 h-1.5 rounded-full mt-1.5 ${
+                  isToday ? 'bg-brand-primary' : 'bg-content-tertiary'
+                }`}
               />
             )}
           </View>
@@ -124,35 +207,42 @@ export default function HomeScreen() {
   );
 
   /** Today's Training card (workout scheduled) */
-  const renderTodayWorkout = () => (
-    <View className="bg-brand-surface rounded-3xl p-6 mb-10 border border-brand-surfaceBorder">
-      <View className="flex-row items-center mb-3">
-        <View className="bg-brand-surfaceAlt rounded-full p-2 mr-3">
-          <Ionicons name="flash-outline" size={18} color={Colors.brand.primary} />
+  const renderTodayWorkout = () => {
+    const routineName = todayRoutineDetail?.name || todayProgramDay?.routineName || 'Scheduled Workout';
+    const exercisesText = todayRoutineDetail?.exerciseCount
+      ? `${todayRoutineDetail.exerciseCount} exercises · ~${todayRoutineDetail.estimatedMinutes ?? 45} min`
+      : 'Scheduled for today';
+
+    return (
+      <View className="bg-brand-surface rounded-3xl p-6 mb-10 border border-brand-surfaceBorder">
+        <View className="flex-row items-center mb-3">
+          <View className="bg-brand-surfaceAlt rounded-full p-2 mr-3">
+            <Ionicons name="flash-outline" size={18} color={Colors.brand.primary} />
+          </View>
+          <Text className="text-content-secondary text-sm font-medium tracking-wide">
+            TODAY&apos;S TRAINING
+          </Text>
         </View>
-        <Text className="text-content-secondary text-sm font-medium tracking-wide">
-          TODAY'S TRAINING
+
+        <Text className="text-brand-primary text-2xl font-bold mb-1" numberOfLines={1}>
+          {routineName}
         </Text>
+        <Text className="text-content-secondary text-base mb-6">
+          {exercisesText}
+        </Text>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center"
+        >
+          <Ionicons name="play" size={16} color={Colors.brand.background} />
+          <Text className="text-brand-background text-base font-semibold ml-2">
+            Start Workout
+          </Text>
+        </TouchableOpacity>
       </View>
-
-      <Text className="text-brand-primary text-2xl font-bold mb-1">
-        Hypertrophy · Push A
-      </Text>
-      <Text className="text-content-secondary text-base mb-6">
-        8 exercises · ~55 min
-      </Text>
-
-      <TouchableOpacity
-        activeOpacity={0.8}
-        className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center"
-      >
-        <Ionicons name="play" size={16} color={Colors.brand.background} />
-        <Text className="text-brand-background text-base font-semibold ml-2">
-          Start Workout
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   /** Rest-day motivational card */
   const renderRestDay = () => (
@@ -177,6 +267,14 @@ export default function HomeScreen() {
     </View>
   );
 
+  /** Loading state for today's card to avoid flickering */
+  const renderTodayLoading = () => (
+    <View className="bg-brand-surface rounded-3xl p-8 mb-10 border border-brand-surfaceBorder items-center justify-center min-h-[200px]">
+      <ActivityIndicator size="small" color={Colors.brand.primary} />
+      <Text className="text-content-secondary text-sm mt-3">Loading today&apos;s workout...</Text>
+    </View>
+  );
+
   /** Prominent card for the last-created routine */
   const renderLastCreatedCard = (routine: RoutineSummary) => (
     <View className="bg-brand-surface rounded-3xl p-6 mb-4 border border-brand-surfaceBorder">
@@ -192,7 +290,7 @@ export default function HomeScreen() {
         {routine.name}
       </Text>
       <Text className="text-content-secondary text-base mb-6">
-        Created {new Date(routine.createdAt).toLocaleDateString()}
+        Created {routine.createdAt ? new Date(routine.createdAt).toLocaleDateString() : ''}
       </Text>
       <TouchableOpacity
         activeOpacity={0.8}
@@ -255,6 +353,7 @@ export default function HomeScreen() {
 
       <TouchableOpacity
         activeOpacity={0.8}
+        onPress={() => router.push('/routines')}
         className="bg-brand-primary rounded-xl py-4 px-8 flex-row items-center justify-center w-full"
       >
         <Ionicons name="add-circle-outline" size={16} color={Colors.brand.background} />
@@ -285,10 +384,14 @@ export default function HomeScreen() {
           {renderWeekStrip()}
 
           {/* ── Today's Training / Rest Day ────────────────────────────── */}
-          {hasWorkoutToday ? renderTodayWorkout() : renderRestDay()}
+          {isLoadingProgram
+            ? renderTodayLoading()
+            : hasWorkoutToday
+              ? renderTodayWorkout()
+              : renderRestDay()}
 
           {/* ── Recent Routines ─────────────────────────────────────────── */}
-          {loading ? (
+          {isLoadingRoutines ? (
             <ActivityIndicator className="mt-10" color={Colors.brand.primary} size="large" />
           ) : routines.length > 0 ? (
             <>

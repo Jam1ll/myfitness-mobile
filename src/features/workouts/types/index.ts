@@ -11,6 +11,14 @@ export interface EnrichedRoutineExercise {
   orderIndex: number;
 }
 
+export interface RoutineSummary {
+  id: string;
+  name: string;
+  routinePrivate: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface RoutineDetailResponse {
   id: string;
   name: string;
@@ -71,10 +79,21 @@ export interface WeeklyProgramResponse {
 export interface CreateWeeklyProgramRequest {
   name: string;
   programDays: ProgramDayItemDto[];
+  weeklyProgramActive: boolean;
 }
 
 export interface UpdateWeeklyProgramRequest {
   name: string;
   programDays: ProgramDayItemDto[];
   weeklyProgramActive: boolean;
+}
+
+// ─── Paginación Genérica ───────────────────────────────────────────────────
+
+export interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  size: number;
+  number: number;
 }
