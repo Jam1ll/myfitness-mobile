@@ -1,14 +1,26 @@
+import { axiosClient } from '../../api/axiosClient';
+import AppText from '@/components/common/AppText';
 import CreateRoutineModal from '@/features/workouts/components/CreateRoutineModal';
 import RoutineDetailsModal from '@/features/workouts/components/RoutineDetailsModal';
 import type { CreateRoutinePayload, RoutineDetailResponse } from '@/features/workouts/types';
-import { Colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { axiosClient } from '../../api/axiosClient';
 
 export default function RoutinesScreen() {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   const [routines, setRoutines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,23 +36,26 @@ export default function RoutinesScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [routineToEdit, setRoutineToEdit] = useState<RoutineDetailResponse | null>(null);
 
-  const fetchRoutines = useCallback(async (page: number, tab: 'MINE' | 'CATALOG', search: string) => {
-    setLoading(true);
-    try {
-      const isMine = tab === 'MINE';
-      const response = await axiosClient.get(`/workouts/routines?page=${page}&size=20&mineOnly=${isMine}&search=${search}`);
-      setRoutines(response.data.content ?? []);
-      setTotalPages(response.data.totalPages ?? 1);
-      setCurrentPage(page);
-    } catch (error: any) {
-      console.log("❌ Error al cargar rutinas HTTP Status:", error.response?.status);
-      console.log("📄 Detalles del error:", error.message, JSON.stringify(error.response?.data, null, 2));
+  const fetchRoutines = useCallback(
+    async (page: number, tab: 'MINE' | 'CATALOG', search: string) => {
+      setLoading(true);
+      try {
+        const isMine = tab === 'MINE';
+        const response = await axiosClient.get(
+          `/workouts/routines?page=${page}&size=20&mineOnly=${isMine}&search=${search}`,
+        );
+        setRoutines(response.data.content ?? []);
+        setTotalPages(response.data.totalPages ?? 1);
+        setCurrentPage(page);
+      } catch {
+        Alert.alert(t('common.error'), t('routines.loadError'));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t],
+  );
 
-      Alert.alert('Error', 'No se pudieron cargar las rutinas.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
   useEffect(() => {
     fetchRoutines(0, activeTab, searchQuery);
   }, [activeTab]);
@@ -51,8 +66,8 @@ export default function RoutinesScreen() {
     try {
       const response = await axiosClient.get(`/workouts/routines/${id}`);
       setSelectedRoutine(response.data);
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo cargar la rutina detallada.');
+    } catch {
+      Alert.alert(t('common.error'), t('routines.loadDetailError'));
       setIsDetailsModalVisible(false);
     } finally {
       setLoadingDetails(false);
@@ -63,52 +78,42 @@ export default function RoutinesScreen() {
     setIsSaving(true);
     try {
       if (id) {
-        // Editar
         await axiosClient.put(`/workouts/routines/${id}`, payload);
       } else {
-        // Crear
         await axiosClient.post('/workouts/routines', payload);
       }
       setIsModalVisible(false);
       setRoutineToEdit(null);
       await fetchRoutines(0, activeTab, searchQuery);
-    } catch (error: any) {
-      console.log("❌ Error HTTP Status:", error.response?.status);
-      console.log("📄 Detalles del rechazo del backend:", JSON.stringify(error.response?.data, null, 2));
-
-      Alert.alert('Error', 'Revisa la consola de Expo para ver los detalles.');
+    } catch {
+      Alert.alert(t('common.error'), t('routines.saveError'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeleteRoutine = async (id: string) => {
-    Alert.alert(
-      "Delete Routine",
-      "Are you sure you want to delete this routine? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            setIsDetailsModalVisible(false);
-            try {
-              await axiosClient.delete(`/workouts/routines/${id}`);
-              await fetchRoutines(0, activeTab, searchQuery);
-            } catch (error) {
-              Alert.alert('Error', 'Could not delete the routine.');
-            }
+    Alert.alert(t('routines.deleteTitle'), t('routines.deleteMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          setIsDetailsModalVisible(false);
+          try {
+            await axiosClient.delete(`/workouts/routines/${id}`);
+            await fetchRoutines(0, activeTab, searchQuery);
+          } catch {
+            Alert.alert(t('common.error'), t('routines.deleteError'));
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   const handleEditRoutine = (routine: RoutineDetailResponse) => {
     setIsDetailsModalVisible(false);
     setRoutineToEdit(routine);
-
     setTimeout(() => {
       setIsModalVisible(true);
     }, 300);
@@ -120,61 +125,173 @@ export default function RoutinesScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-brand-background" edges={['top']}>
+    <SafeAreaView
+      style={{ backgroundColor: colors.brand.background }}
+      className="flex-1"
+      edges={['top']}
+    >
       <View className="px-6 mt-4 mb-2">
-        <Text className="text-brand-primary text-3xl font-bold">Routines</Text>
-        <Text className="text-content-secondary text-base mt-1">Explore and manage routines</Text>
+        <AppText
+          weight="bold"
+          style={{ color: colors.brand.primary }}
+          className="text-3xl font-bold"
+        >
+          {t('routines.title')}
+        </AppText>
+        <AppText
+          style={{ color: colors.content.secondary }}
+          className="text-base mt-1"
+        >
+          {t('routines.subtitle')}
+        </AppText>
       </View>
 
       <View className="px-6 flex-row mb-5 mt-2">
-        <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveTab('CATALOG')} className={`mr-4 pb-2 border-b-2 ${activeTab === 'CATALOG' ? 'border-brand-primary' : 'border-transparent'}`}>
-          <Text className={`text-base font-semibold ${activeTab === 'CATALOG' ? 'text-brand-primary' : 'text-content-tertiary'}`}>Public Catalog</Text>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setActiveTab('CATALOG')}
+          style={{
+            borderBottomColor:
+              activeTab === 'CATALOG' ? colors.brand.primary : 'transparent',
+          }}
+          className="mr-4 pb-2 border-b-2"
+        >
+          <AppText
+            weight={activeTab === 'CATALOG' ? 'bold' : 'regular'}
+            style={{
+              color:
+                activeTab === 'CATALOG'
+                  ? colors.brand.primary
+                  : colors.content.tertiary,
+            }}
+            className="text-base font-semibold"
+          >
+            {t('routines.catalogTab')}
+          </AppText>
         </TouchableOpacity>
-        <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveTab('MINE')} className={`pb-2 border-b-2 ${activeTab === 'MINE' ? 'border-brand-primary' : 'border-transparent'}`}>
-          <Text className={`text-base font-semibold ${activeTab === 'MINE' ? 'text-brand-primary' : 'text-content-tertiary'}`}>My Routines</Text>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setActiveTab('MINE')}
+          style={{
+            borderBottomColor:
+              activeTab === 'MINE' ? colors.brand.primary : 'transparent',
+          }}
+          className="pb-2 border-b-2"
+        >
+          <AppText
+            weight={activeTab === 'MINE' ? 'bold' : 'regular'}
+            style={{
+              color:
+                activeTab === 'MINE'
+                  ? colors.brand.primary
+                  : colors.content.tertiary,
+            }}
+            className="text-base font-semibold"
+          >
+            {t('routines.myRoutinesTab')}
+          </AppText>
         </TouchableOpacity>
       </View>
 
-      <View className="mx-6 mb-4 bg-brand-surface rounded-2xl px-4 py-4 flex-row items-center border border-brand-surfaceBorder">
-        <Ionicons name="search-outline" size={18} color={Colors.content.secondary} />
+      <View
+        style={{
+          backgroundColor: colors.brand.surface,
+          borderColor: colors.brand.surfaceBorder,
+        }}
+        className="mx-6 mb-4 rounded-2xl px-4 py-4 flex-row items-center border"
+      >
+        <Ionicons name="search-outline" size={18} color={colors.content.secondary} />
         <TextInput
-          placeholder={`Search ${activeTab === 'CATALOG' ? 'catalog' : 'your routines'}...`}
-          placeholderTextColor={Colors.content.secondary}
+          placeholder={
+            activeTab === 'CATALOG'
+              ? t('routines.searchPlaceholderCatalog')
+              : t('routines.searchPlaceholderMine')
+          }
+          placeholderTextColor={colors.content.secondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={() => fetchRoutines(0, activeTab, searchQuery)}
           returnKeyType="search"
-          className="text-brand-primary text-base ml-3 flex-1"
+          style={{ color: colors.brand.primary }}
+          className="text-base ml-3 flex-1"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => { setSearchQuery(''); fetchRoutines(0, activeTab, ''); }}>
-            <Ionicons name="close-circle" size={18} color={Colors.content.secondary} />
+          <TouchableOpacity
+            onPress={() => {
+              setSearchQuery('');
+              fetchRoutines(0, activeTab, '');
+            }}
+          >
+            <Ionicons name="close-circle" size={18} color={colors.content.secondary} />
           </TouchableOpacity>
         )}
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {loading ? (
-          <ActivityIndicator className="mt-10" color={Colors.brand.primary} size="large" />
+          <ActivityIndicator className="mt-10" color={colors.brand.primary} size="large" />
         ) : (
           <View className="pb-20">
             {routines.length === 0 ? (
               <View className="items-center justify-center mt-10">
-                <Text className="text-content-tertiary text-base">No routines found.</Text>
+                <AppText
+                  style={{ color: colors.content.tertiary }}
+                  className="text-base"
+                >
+                  {t('routines.noRoutinesFound')}
+                </AppText>
               </View>
             ) : (
               <View className="px-4 flex-col">
                 {routines.map((routine: any) => (
-                  <TouchableOpacity key={routine.id} activeOpacity={0.7} className="px-2 mb-4" onPress={() => handleOpenDetails(routine.id)}>
-                    <View className="bg-brand-surface rounded-2xl p-5 border border-brand-surfaceBorder flex-row items-center justify-between">
+                  <TouchableOpacity
+                    key={routine.id}
+                    activeOpacity={0.7}
+                    className="px-2 mb-4"
+                    onPress={() => handleOpenDetails(routine.id)}
+                  >
+                    <View
+                      style={{
+                        backgroundColor: colors.brand.surface,
+                        borderColor: colors.brand.surfaceBorder,
+                      }}
+                      className="rounded-2xl p-5 border flex-row items-center justify-between"
+                    >
                       <View className="flex-1">
                         <View className="flex-row items-center mb-2">
-                          <Ionicons name={routine.routinePrivate ? "lock-closed" : "globe-outline"} size={14} color={routine.routinePrivate ? Colors.status.dangerLight : Colors.status.infoLight} className="mr-2" />
-                          <Text className="text-content-secondary text-xs ml-2">{routine.routinePrivate ? 'Private' : 'Public'}</Text>
+                          <Ionicons
+                            name={routine.routinePrivate ? 'lock-closed' : 'globe-outline'}
+                            size={14}
+                            color={
+                              routine.routinePrivate
+                                ? colors.status.dangerLight
+                                : colors.status.infoLight
+                            }
+                          />
+                          <AppText
+                            style={{ color: colors.content.secondary }}
+                            className="text-xs ml-2"
+                          >
+                            {routine.routinePrivate
+                              ? t('routines.private')
+                              : t('routines.public')}
+                          </AppText>
                         </View>
-                        <Text className="text-brand-primary text-xl font-bold" numberOfLines={1}>{routine.name}</Text>
+                        <AppText
+                          weight="bold"
+                          style={{ color: colors.brand.primary }}
+                          className="text-xl font-bold"
+                          numberOfLines={1}
+                        >
+                          {routine.name}
+                        </AppText>
                       </View>
-                      <Ionicons name="chevron-forward" size={20} color={Colors.content.tertiary} />
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color={colors.content.tertiary}
+                      />
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -183,12 +300,57 @@ export default function RoutinesScreen() {
 
             {totalPages > 1 && (
               <View className="flex-row items-center justify-between mx-6 mt-4 mb-8">
-                <TouchableOpacity onPress={() => { if (currentPage > 0) fetchRoutines(currentPage - 1, activeTab, searchQuery) }} disabled={currentPage === 0} className={`px-4 py-2 rounded-lg ${currentPage === 0 ? 'bg-brand-surface' : 'bg-brand-surfaceAlt'}`}>
-                  <Text className={currentPage === 0 ? 'text-content-disabled' : 'text-brand-primary'}>Prev</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (currentPage > 0) fetchRoutines(currentPage - 1, activeTab, searchQuery);
+                  }}
+                  disabled={currentPage === 0}
+                  style={{
+                    backgroundColor:
+                      currentPage === 0 ? colors.brand.surface : colors.brand.surfaceAlt,
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                >
+                  <AppText
+                    style={{
+                      color:
+                        currentPage === 0
+                          ? colors.content.disabled
+                          : colors.brand.primary,
+                    }}
+                  >
+                    {t('common.prev')}
+                  </AppText>
                 </TouchableOpacity>
-                <Text className="text-content-secondary">Page {currentPage + 1} of {totalPages}</Text>
-                <TouchableOpacity onPress={() => { if (currentPage < totalPages - 1) fetchRoutines(currentPage + 1, activeTab, searchQuery) }} disabled={currentPage >= totalPages - 1} className={`px-4 py-2 rounded-lg ${currentPage >= totalPages - 1 ? 'bg-brand-surface' : 'bg-brand-surfaceAlt'}`}>
-                  <Text className={currentPage >= totalPages - 1 ? 'text-content-disabled' : 'text-brand-primary'}>Next</Text>
+
+                <AppText style={{ color: colors.content.secondary }}>
+                  {t('common.pageOf', { current: currentPage + 1, total: totalPages })}
+                </AppText>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    if (currentPage < totalPages - 1)
+                      fetchRoutines(currentPage + 1, activeTab, searchQuery);
+                  }}
+                  disabled={currentPage >= totalPages - 1}
+                  style={{
+                    backgroundColor:
+                      currentPage >= totalPages - 1
+                        ? colors.brand.surface
+                        : colors.brand.surfaceAlt,
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                >
+                  <AppText
+                    style={{
+                      color:
+                        currentPage >= totalPages - 1
+                          ? colors.content.disabled
+                          : colors.brand.primary,
+                    }}
+                  >
+                    {t('common.next')}
+                  </AppText>
                 </TouchableOpacity>
               </View>
             )}
@@ -196,8 +358,13 @@ export default function RoutinesScreen() {
         )}
       </ScrollView>
 
-      <TouchableOpacity activeOpacity={0.85} onPress={openCreateModal} className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-brand-primary items-center justify-center shadow-lg">
-        <Ionicons name="add" size={28} color={Colors.brand.background} />
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={openCreateModal}
+        style={{ backgroundColor: colors.brand.primary }}
+        className="absolute bottom-6 right-6 w-14 h-14 rounded-full items-center justify-center shadow-lg"
+      >
+        <Ionicons name="add" size={28} color={colors.brand.background} />
       </TouchableOpacity>
 
       <RoutineDetailsModal
@@ -216,7 +383,6 @@ export default function RoutinesScreen() {
         isSaving={isSaving}
         initialData={routineToEdit}
       />
-
     </SafeAreaView>
   );
 }

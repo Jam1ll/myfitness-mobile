@@ -1,8 +1,18 @@
 import { axiosClient } from '@/api/axiosClient';
-import { Colors } from '@/theme/colors';
+import AppText from '@/components/common/AppText';
+import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 type ExerciseItem = {
   id: string;
@@ -17,12 +27,19 @@ interface ExerciseSelectorProps {
   initialSelectedIds?: string[];
 }
 
-export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, initialSelectedIds = [] }: ExerciseSelectorProps) {
+export default function ExerciseSelectorModal({
+  isVisible,
+  onClose,
+  onConfirm,
+  initialSelectedIds = [],
+}: ExerciseSelectorProps) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   const [exercises, setExercises] = useState<ExerciseItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
 
-  // Usamos una referencia para saber si ya inicializamos los IDs en esta apertura del modal
   const hasInitialized = useRef(false);
 
   useEffect(() => {
@@ -33,41 +50,63 @@ export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, i
       }
       fetchExercises();
     } else {
-      // Reseteamos el flag cuando se cierra para la próxima vez que se abra
       hasInitialized.current = false;
     }
-  }, [isVisible]); // Quitamos initialSelectedIds de las dependencias para evitar el bucle
+  }, [isVisible]);
 
   const fetchExercises = async () => {
     setLoading(true);
     try {
       const response = await axiosClient.get('/exercises?page=0&size=50');
       setExercises(response.data.content || []);
-    } catch (error) {
-      Alert.alert('Error', 'Could not load exercises catalog.');
+    } catch {
+      Alert.alert(t('common.error'), t('modals.loadCatalogError'));
     } finally {
       setLoading(false);
     }
   };
 
   const toggleExercise = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(eId => eId !== id) : [...prev, id]);
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((eId) => eId !== id) : [...prev, id],
+    );
   };
 
   return (
-    <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={isVisible}
+      onRequestClose={onClose}
+    >
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-brand-background/80" onPress={onClose} />
+        <Pressable
+          style={{ backgroundColor: colors.brand.background + 'B3' }}
+          className="absolute inset-0"
+          onPress={onClose}
+        />
 
-        <View className="bg-brand-surface rounded-t-3xl px-6 pt-3 pb-10 min-h-[70%] max-h-[90%]">
+        <View
+          style={{ backgroundColor: colors.brand.surface }}
+          className="rounded-t-3xl px-6 pt-3 pb-10 min-h-[70%] max-h-[90%]"
+        >
           <View className="items-center mb-6">
-            <View className="w-12 h-1.5 rounded-full bg-brand-muted" />
+            <View
+              style={{ backgroundColor: colors.brand.muted }}
+              className="w-12 h-1.5 rounded-full"
+            />
           </View>
 
-          <Text className="text-brand-primary text-2xl font-bold mb-6">Select Exercises</Text>
+          <AppText
+            weight="bold"
+            style={{ color: colors.brand.primary }}
+            className="text-2xl font-bold mb-6"
+          >
+            {t('modals.selectExercises')}
+          </AppText>
 
           {loading ? (
-            <ActivityIndicator color={Colors.brand.primary} size="large" className="mt-10" />
+            <ActivityIndicator color={colors.brand.primary} size="large" className="mt-10" />
           ) : (
             <FlatList
               data={exercises}
@@ -79,13 +118,38 @@ export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, i
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => toggleExercise(item.id)}
-                    className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border ${isSelected ? 'bg-brand-surfaceAlt border-brand-primary' : 'bg-brand-background border-brand-surfaceBorder'}`}
+                    style={{
+                      backgroundColor: isSelected
+                        ? colors.brand.surfaceAlt
+                        : colors.brand.background,
+                      borderColor: isSelected
+                        ? colors.brand.primary
+                        : colors.brand.surfaceBorder,
+                    }}
+                    className="flex-row items-center justify-between p-4 mb-3 rounded-xl border"
                   >
                     <View>
-                      <Text className="text-brand-primary font-semibold text-base">{item.name}</Text>
-                      <Text className="text-content-tertiary text-xs">{item.muscleGroup}</Text>
+                      <AppText
+                        weight="bold"
+                        style={{ color: colors.brand.primary }}
+                        className="font-semibold text-base"
+                      >
+                        {item.name}
+                      </AppText>
+                      <AppText
+                        style={{ color: colors.content.tertiary }}
+                        className="text-xs"
+                      >
+                        {item.muscleGroup}
+                      </AppText>
                     </View>
-                    {isSelected && <Ionicons name="checkmark-circle" size={24} color={Colors.brand.primary} />}
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={24}
+                        color={colors.brand.primary}
+                      />
+                    )}
                   </TouchableOpacity>
                 );
               }}
@@ -94,10 +158,20 @@ export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, i
 
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => { onConfirm(selectedIds); onClose(); }}
-            className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center mt-4"
+            onPress={() => {
+              onConfirm(selectedIds);
+              onClose();
+            }}
+            style={{ backgroundColor: colors.brand.primary }}
+            className="rounded-xl py-4 flex-row items-center justify-center mt-4"
           >
-            <Text className="text-brand-background text-base font-semibold">Confirm ({selectedIds.length})</Text>
+            <AppText
+              weight="bold"
+              style={{ color: colors.brand.background }}
+              className="text-base font-semibold"
+            >
+              {t('modals.confirmCount', { count: selectedIds.length })}
+            </AppText>
           </TouchableOpacity>
         </View>
       </View>

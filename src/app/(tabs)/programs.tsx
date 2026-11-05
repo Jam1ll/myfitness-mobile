@@ -1,18 +1,19 @@
-import { Colors } from '@/theme/colors';
+import { axiosClient } from '../../api/axiosClient';
+import AppText from '@/components/common/AppText';
 import CreateProgramModal from '@/features/workouts/components/CreateProgramModal';
 import type { DayOfWeek, WeeklyProgramResponse } from '@/features/workouts/types';
+import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { axiosClient } from '../../api/axiosClient';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -26,19 +27,22 @@ const DAY_ORDER: DayOfWeek[] = [
   'SUNDAY',
 ];
 
-const DAY_SHORT: Record<DayOfWeek, string> = {
-  MONDAY: 'Mon',
-  TUESDAY: 'Tue',
-  WEDNESDAY: 'Wed',
-  THURSDAY: 'Thu',
-  FRIDAY: 'Fri',
-  SATURDAY: 'Sat',
-  SUNDAY: 'Sun',
+const DAY_KEY_MAP: Record<DayOfWeek, string> = {
+  MONDAY: 'mon',
+  TUESDAY: 'tue',
+  WEDNESDAY: 'wed',
+  THURSDAY: 'thu',
+  FRIDAY: 'fri',
+  SATURDAY: 'sat',
+  SUNDAY: 'sun',
 };
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
 export default function ProgramsScreen() {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   const [programs, setPrograms] = useState<WeeklyProgramResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,11 +57,11 @@ export default function ProgramsScreen() {
       const response = await axiosClient.get('/workouts/programs');
       setPrograms(response.data.content ?? response.data ?? []);
     } catch {
-      Alert.alert('Error', 'Could not load your programs.');
+      Alert.alert(t('common.error'), t('programs.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchPrograms();
@@ -76,25 +80,21 @@ export default function ProgramsScreen() {
   };
 
   const handleDeleteProgram = (id: string) => {
-    Alert.alert(
-      'Delete Program',
-      'Are you sure you want to delete this program? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await axiosClient.delete(`/workouts/programs/${id}`);
-              await fetchPrograms();
-            } catch {
-              Alert.alert('Error', 'Could not delete the program.');
-            }
-          },
+    Alert.alert(t('programs.deleteTitle'), t('programs.deleteMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await axiosClient.delete(`/workouts/programs/${id}`);
+            await fetchPrograms();
+          } catch {
+            Alert.alert(t('common.error'), t('programs.deleteError'));
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   // ── Render helpers ──────────────────────────────────────────────────────
@@ -107,25 +107,38 @@ export default function ProgramsScreen() {
         {DAY_ORDER.map((day) => {
           const isAssigned = assignedDays.has(day);
           const programDay = program.programDays.find((d) => d.dayOfWeek === day);
+          const dayShort = t(`home.weekDays.${DAY_KEY_MAP[day]}`);
 
           return (
             <View
               key={day}
-              className={`px-2.5 py-1.5 rounded-lg ${
-                isAssigned ? 'bg-status-info/15 border border-status-info/30' : 'bg-brand-surfaceAlt/50 border border-brand-surfaceBorder'
-              }`}
+              style={{
+                backgroundColor: isAssigned
+                  ? colors.status.info + '20'
+                  : colors.brand.surfaceAlt + '80',
+                borderColor: isAssigned
+                  ? colors.status.info + '40'
+                  : colors.brand.surfaceBorder,
+              }}
+              className="px-2.5 py-1.5 rounded-lg border"
             >
-              <Text
-                className={`text-[10px] font-bold uppercase ${
-                  isAssigned ? 'text-status-infoLight' : 'text-content-disabled'
-                }`}
+              <AppText
+                weight="bold"
+                style={{
+                  color: isAssigned ? colors.status.infoLight : colors.content.disabled,
+                }}
+                className="text-[10px] font-bold uppercase"
               >
-                {DAY_SHORT[day]}
-              </Text>
+                {dayShort}
+              </AppText>
               {isAssigned && programDay?.routineName && (
-                <Text className="text-brand-primary text-[9px] mt-0.5" numberOfLines={1}>
+                <AppText
+                  style={{ color: colors.brand.primary }}
+                  className="text-[9px] mt-0.5"
+                  numberOfLines={1}
+                >
                   {programDay.routineName}
-                </Text>
+                </AppText>
               )}
             </View>
           );
@@ -137,43 +150,72 @@ export default function ProgramsScreen() {
   // ── Main render ─────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView className="flex-1 bg-brand-background" edges={['top']}>
+    <SafeAreaView
+      style={{ backgroundColor: colors.brand.background }}
+      className="flex-1"
+      edges={['top']}
+    >
       <View className="px-6 mt-4 mb-2">
-        <Text className="text-brand-primary text-3xl font-bold">Programs</Text>
-        <Text className="text-content-secondary text-base mt-1">
-          Weekly programs built from your routines
-        </Text>
+        <AppText
+          weight="bold"
+          style={{ color: colors.brand.primary }}
+          className="text-3xl font-bold"
+        >
+          {t('programs.title')}
+        </AppText>
+        <AppText
+          style={{ color: colors.content.secondary }}
+          className="text-base mt-1"
+        >
+          {t('programs.subtitle')}
+        </AppText>
       </View>
 
       <ScrollView className="flex-1 mt-4" showsVerticalScrollIndicator={false}>
         {loading ? (
-          <ActivityIndicator className="mt-10" color={Colors.brand.primary} size="large" />
+          <ActivityIndicator className="mt-10" color={colors.brand.primary} size="large" />
         ) : (
           <View className="pb-20">
             {programs.length === 0 ? (
               <View className="items-center justify-center mt-10 px-8">
-                <Ionicons name="calendar-outline" size={48} color={Colors.brand.borderMuted} />
-                <Text className="text-content-tertiary text-base mt-4 text-center">
-                  No programs yet. Create one to organize your weekly training!
-                </Text>
+                <Ionicons name="calendar-outline" size={48} color={colors.brand.borderMuted} />
+                <AppText
+                  style={{ color: colors.content.tertiary }}
+                  className="text-base mt-4 text-center"
+                >
+                  {t('programs.noPrograms')}
+                </AppText>
               </View>
             ) : (
               <View className="px-4 flex-col">
                 {programs.map((program) => (
-                  <View
-                    key={program.id}
-                    className="px-2 mb-4"
-                  >
-                    <View className="bg-brand-surface rounded-2xl p-5 border border-brand-surfaceBorder">
+                  <View key={program.id} className="px-2 mb-4">
+                    <View
+                      style={{
+                        backgroundColor: colors.brand.surface,
+                        borderColor: colors.brand.surfaceBorder,
+                      }}
+                      className="rounded-2xl p-5 border"
+                    >
                       {/* Header */}
                       <View className="flex-row items-center justify-between">
                         <View className="flex-1 mr-3">
-                          <Text className="text-brand-primary text-xl font-bold" numberOfLines={1}>
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="text-xl font-bold"
+                            numberOfLines={1}
+                          >
                             {program.name}
-                          </Text>
-                          <Text className="text-content-tertiary text-xs mt-1">
-                            {program.programDays.length} day{program.programDays.length !== 1 ? 's' : ''} assigned
-                          </Text>
+                          </AppText>
+                          <AppText
+                            style={{ color: colors.content.tertiary }}
+                            className="text-xs mt-1"
+                          >
+                            {t('programs.daysAssigned', {
+                              count: program.programDays.length,
+                            })}
+                          </AppText>
                         </View>
 
                         {program.programOwner && (
@@ -181,16 +223,22 @@ export default function ProgramsScreen() {
                             <TouchableOpacity
                               activeOpacity={0.7}
                               onPress={() => handleEditProgram(program)}
-                              className="w-9 h-9 rounded-full bg-status-info/10 items-center justify-center"
+                              style={{ backgroundColor: colors.status.info + '15' }}
+                              className="w-9 h-9 rounded-full items-center justify-center"
                             >
-                              <Ionicons name="pencil" size={16} color={Colors.status.info} />
+                              <Ionicons name="pencil" size={16} color={colors.status.info} />
                             </TouchableOpacity>
                             <TouchableOpacity
                               activeOpacity={0.7}
                               onPress={() => handleDeleteProgram(program.id)}
-                              className="w-9 h-9 rounded-full bg-status-danger/10 items-center justify-center"
+                              style={{ backgroundColor: colors.status.danger + '15' }}
+                              className="w-9 h-9 rounded-full items-center justify-center"
                             >
-                              <Ionicons name="trash-outline" size={16} color={Colors.status.danger} />
+                              <Ionicons
+                                name="trash-outline"
+                                size={16}
+                                color={colors.status.danger}
+                              />
                             </TouchableOpacity>
                           </View>
                         )}
@@ -211,9 +259,10 @@ export default function ProgramsScreen() {
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={openCreateModal}
-        className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-brand-primary items-center justify-center shadow-lg"
+        style={{ backgroundColor: colors.brand.primary }}
+        className="absolute bottom-6 right-6 w-14 h-14 rounded-full items-center justify-center shadow-lg"
       >
-        <Ionicons name="add" size={28} color={Colors.brand.background} />
+        <Ionicons name="add" size={28} color={colors.brand.background} />
       </TouchableOpacity>
 
       {/* Create / Edit Modal */}

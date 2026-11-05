@@ -1,7 +1,21 @@
-import { Colors } from '@/theme/colors';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ExerciseResponse } from './ExerciseDetailsModal';
+import AppText from '@/components/common/AppText';
+import { useTheme } from '@/theme/ThemeProvider';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Switch,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 const MUSCLE_GROUPS = ['CHEST', 'BACK', 'ARMS', 'LEGS', 'CORE', 'SHOULDERS'] as const;
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
@@ -21,11 +35,20 @@ interface CreateExerciseProps {
   initialData?: ExerciseResponse | null;
 }
 
-export default function CreateExerciseModal({ isVisible, onClose, onSave, isSaving, initialData }: CreateExerciseProps) {
+export default function CreateExerciseModal({
+  isVisible,
+  onClose,
+  onSave,
+  isSaving,
+  initialData,
+}: CreateExerciseProps) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>('CHEST');
-  const [exercisePrivate, setExercisePrivate] = useState(false); // 👈 Por defecto false (público) o true según tu preferencia
+  const [exercisePrivate, setExercisePrivate] = useState(false);
 
   useEffect(() => {
     if (isVisible) {
@@ -33,99 +56,158 @@ export default function CreateExerciseModal({ isVisible, onClose, onSave, isSavi
         setName(initialData.name);
         setDescription(initialData.description);
         setMuscleGroup(initialData.muscleGroup as MuscleGroup);
-        // 🔒 Forzamos un booleano seguro por si initialData.exercisePrivate viniera nulo de BD
         setExercisePrivate(Boolean(initialData.exercisePrivate));
       } else {
         setName('');
         setDescription('');
         setMuscleGroup('CHEST');
-        setExercisePrivate(false); // 👈 Aseguramos false al crear limpio
+        setExercisePrivate(false);
       }
     }
   }, [isVisible, initialData]);
 
   const handleSave = () => {
     if (!name || name.trim().length < 3) {
-      Alert.alert('Validation Error', 'Exercise name must have at least 3 characters.');
+      Alert.alert(t('common.error'), t('exercises.validationName'));
       return;
     }
     if (!description || description.trim().length < 10) {
-      Alert.alert('Validation Error', 'Description must have at least 10 characters.');
+      Alert.alert(t('common.error'), t('exercises.validationDescription'));
       return;
     }
 
-    onSave({
-      name: name.trim(),
-      description: description.trim(),
-      muscleGroup,
-      exercisePrivate: Boolean(exercisePrivate),
-    }, initialData?.id);
+    onSave(
+      {
+        name: name.trim(),
+        description: description.trim(),
+        muscleGroup,
+        exercisePrivate: Boolean(exercisePrivate),
+      },
+      initialData?.id,
+    );
   };
 
-  const handleClose = () => {
-    onClose();
-  };
-
-  const isEditing = !!initialData;
+  const isEditing = Boolean(initialData);
 
   return (
-    <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-brand-background/70" onPress={handleClose} />
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={isVisible}
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1 justify-end"
+      >
+        <Pressable
+          style={{ backgroundColor: colors.brand.background + 'B3' }}
+          className="absolute inset-0"
+          onPress={onClose}
+        />
 
-        <View className="bg-brand-surface rounded-t-3xl px-6 pt-3 pb-10">
+        <View
+          style={{ backgroundColor: colors.brand.surface }}
+          className="rounded-t-3xl px-6 pt-3 pb-10"
+        >
           <View className="items-center mb-6">
-            <View className="w-12 h-1.5 rounded-full bg-brand-muted" />
+            <View
+              style={{ backgroundColor: colors.brand.muted }}
+              className="w-12 h-1.5 rounded-full"
+            />
           </View>
 
-          <Text className="text-brand-primary text-2xl font-bold mb-6">
-            {isEditing ? 'Edit exercise' : 'Create exercise'}
-          </Text>
+          <AppText
+            weight="bold"
+            style={{ color: colors.brand.primary }}
+            className="text-2xl font-bold mb-6"
+          >
+            {isEditing ? t('exercises.editExercise') : t('exercises.createExercise')}
+          </AppText>
 
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Exercise name..."
-            placeholderTextColor={Colors.content.tertiary}
-            className="bg-brand-background text-brand-primary border border-brand-surfaceBorder rounded-xl px-4 py-3 mb-4"
+            placeholder={t('exercises.exerciseNamePlaceholder')}
+            placeholderTextColor={colors.content.tertiary}
+            style={{
+              backgroundColor: colors.brand.background,
+              color: colors.brand.primary,
+              borderColor: colors.brand.surfaceBorder,
+            }}
+            className="border rounded-xl px-4 py-3 mb-4 text-base"
           />
 
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Description..."
-            placeholderTextColor={Colors.content.tertiary}
+            placeholder={t('exercises.descriptionPlaceholder')}
+            placeholderTextColor={colors.content.tertiary}
             multiline
             numberOfLines={4}
             textAlignVertical="top"
-            className="bg-brand-background text-brand-primary border border-brand-surfaceBorder rounded-xl px-4 py-3 mb-4 h-28"
+            style={{
+              backgroundColor: colors.brand.background,
+              color: colors.brand.primary,
+              borderColor: colors.brand.surfaceBorder,
+            }}
+            className="border rounded-xl px-4 py-3 mb-4 h-28 text-base"
           />
 
-          <Text className="text-content-secondary text-sm font-medium mb-3">Muscle group</Text>
+          <AppText
+            weight="semibold"
+            style={{ color: colors.content.secondary }}
+            className="text-sm font-medium mb-3"
+          >
+            {t('exercises.muscleGroupLabel')}
+          </AppText>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
             <View className="flex-row">
-              {MUSCLE_GROUPS.map((group) => (
-                <TouchableOpacity
-                  key={group}
-                  activeOpacity={0.8}
-                  onPress={() => setMuscleGroup(group)}
-                  className={`rounded-full px-4 py-2 mr-2 ${muscleGroup === group ? 'bg-brand-primary' : 'bg-brand-surfaceAlt'}`}
-                >
-                  <Text className={`text-sm font-medium ${muscleGroup === group ? 'text-brand-background' : 'text-content-secondary'}`}>
-                    {group}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {MUSCLE_GROUPS.map((group) => {
+                const isSelected = muscleGroup === group;
+                return (
+                  <TouchableOpacity
+                    key={group}
+                    activeOpacity={0.8}
+                    onPress={() => setMuscleGroup(group)}
+                    style={{
+                      backgroundColor: isSelected
+                        ? colors.brand.primary
+                        : colors.brand.surfaceAlt,
+                    }}
+                    className="rounded-full px-4 py-2 mr-2"
+                  >
+                    <AppText
+                      weight={isSelected ? 'bold' : 'regular'}
+                      style={{
+                        color: isSelected
+                          ? colors.brand.background
+                          : colors.content.secondary,
+                      }}
+                      className="text-sm font-medium"
+                    >
+                      {t(`exercises.muscleGroups.${group.toLowerCase()}`, {
+                        defaultValue: group,
+                      })}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
 
           <View className="flex-row items-center justify-between mb-8">
-            <Text className="text-content-secondary flex-1 mr-4">Private exercise (Only you can see it)</Text>
+            <AppText
+              style={{ color: colors.content.secondary }}
+              className="flex-1 mr-4 text-sm"
+            >
+              {t('exercises.privateExerciseLabel')}
+            </AppText>
             <Switch
               value={exercisePrivate}
               onValueChange={setExercisePrivate}
-              trackColor={{ false: Colors.brand.borderMuted, true: Colors.brand.primary }}
-              thumbColor={exercisePrivate ? Colors.brand.background : Colors.content.secondary}
+              trackColor={{ false: colors.brand.borderMuted, true: colors.brand.primary }}
+              thumbColor={exercisePrivate ? colors.brand.background : colors.content.secondary}
             />
           </View>
 
@@ -133,9 +215,20 @@ export default function CreateExerciseModal({ isVisible, onClose, onSave, isSavi
             activeOpacity={0.8}
             onPress={handleSave}
             disabled={isSaving}
-            className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center"
+            style={{ backgroundColor: colors.brand.primary }}
+            className="rounded-xl py-4 flex-row items-center justify-center"
           >
-            {isSaving ? <ActivityIndicator color={Colors.brand.background} /> : <Text className="text-brand-background text-base font-semibold">{isEditing ? 'Update Exercise' : 'Save Exercise'}</Text>}
+            {isSaving ? (
+              <ActivityIndicator color={colors.brand.background} />
+            ) : (
+              <AppText
+                weight="bold"
+                style={{ color: colors.brand.background }}
+                className="text-base font-semibold"
+              >
+                {isEditing ? t('exercises.updateExercise') : t('exercises.saveExercise')}
+              </AppText>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

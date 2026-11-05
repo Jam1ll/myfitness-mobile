@@ -1,17 +1,18 @@
 import { workoutApi } from '@/api/workoutApi';
-import { useWorkoutStore } from '@/store/useWorkoutStore';
+import AppText from '@/components/common/AppText';
 import type { DayOfWeek, RoutineSummary } from '@/features/workouts/types';
-import { Colors } from '@/theme/colors';
+import { useWorkoutStore } from '@/store/useWorkoutStore';
+import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Platform,
   ScrollView,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -19,7 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ─── Weekly day helpers ─────────────────────────────────────────────────────────
 
-const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+const WEEK_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
 const INDEX_TO_DAY_OF_WEEK: Record<number, DayOfWeek> = {
   0: 'MONDAY',
@@ -51,6 +52,8 @@ function todayIndex(): number {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const [userName, setUserName] = useState('');
 
   // ── Workout Store ─────────────────────────────────────────────────────────
@@ -153,7 +156,7 @@ export default function HomeScreen() {
 
   const todayRoutineDetail = useMemo(() => {
     if (!todayRoutineId) return null;
-    const fallbackName = todayProgramDay?.routineName || 'Today Workout';
+    const fallbackName = todayProgramDay?.routineName || t('home.todayWorkout');
 
     if (todayRoutineDetailData) {
       const exercises = todayRoutineDetailData.enrichedRoutineExercises ?? [];
@@ -170,7 +173,7 @@ export default function HomeScreen() {
     return {
       name: routineFromList?.name || fallbackName,
     };
-  }, [todayRoutineId, todayRoutineDetailData, todayProgramDay?.routineName, routines]);
+  }, [todayRoutineId, todayRoutineDetailData, todayProgramDay?.routineName, routines, t]);
 
   const firstRoutine = routines[0] ?? null;
   const remainingRoutines = routines.slice(1);
@@ -203,7 +206,8 @@ export default function HomeScreen() {
       }
     }
 
-    const routineName = todayRoutineDetail?.name || todayProgramDay?.routineName || 'Today Workout';
+    const routineName =
+      todayRoutineDetail?.name || todayProgramDay?.routineName || t('home.todayWorkout');
     startSession(todayRoutineId, routineName, exercises);
     router.push('/active-workout');
   }, [
@@ -214,6 +218,7 @@ export default function HomeScreen() {
     todayProgramDay?.routineName,
     startSession,
     router,
+    t,
   ]);
 
   const handleStartLastCreated = useCallback(
@@ -246,38 +251,43 @@ export default function HomeScreen() {
       return;
     }
 
-    startSession(null, 'Freestyle Workout', []);
+    startSession(null, t('home.freestyleWorkout'), []);
     router.push('/active-workout');
-  }, [activeSession, startSession, router]);
+  }, [activeSession, startSession, router, t]);
 
   // ── Render helpers ────────────────────────────────────────────────────────
 
   /** Weekly progress strip */
   const renderWeekStrip = () => (
     <View className="flex-row justify-between mb-8">
-      {WEEK_DAYS.map((label, idx) => {
+      {WEEK_DAY_KEYS.map((key, idx) => {
         const isToday = idx === currentDayIdx;
+        const label = t(`home.weekDays.${key}`);
         return (
-          <View key={label} className="items-center flex-1">
+          <View key={key} className="items-center flex-1">
             <View
-              className={`w-10 h-10 rounded-full items-center justify-center ${
-                isToday ? 'bg-brand-primary' : 'bg-brand-surfaceAlt'
-              }`}
+              style={{
+                backgroundColor: isToday ? colors.brand.primary : colors.brand.surfaceAlt,
+              }}
+              className="w-10 h-10 rounded-full items-center justify-center"
             >
-              <Text
-                className={`text-xs font-semibold ${
-                  isToday ? 'text-brand-background' : 'text-content-secondary'
-                }`}
+              <AppText
+                weight="bold"
+                style={{
+                  color: isToday ? colors.brand.background : colors.content.secondary,
+                }}
+                className="text-xs font-semibold"
               >
                 {label}
-              </Text>
+              </AppText>
             </View>
             {/* Scheduled-workout dot indicator */}
             {scheduledDays.has(idx) && (
               <View
-                className={`w-1.5 h-1.5 rounded-full mt-1.5 ${
-                  isToday ? 'bg-brand-primary' : 'bg-content-tertiary'
-                }`}
+                style={{
+                  backgroundColor: isToday ? colors.brand.primary : colors.content.tertiary,
+                }}
+                className="w-1.5 h-1.5 rounded-full mt-1.5"
               />
             )}
           </View>
@@ -288,38 +298,66 @@ export default function HomeScreen() {
 
   /** Today's Training card (workout scheduled) */
   const renderTodayWorkout = () => {
-    const routineName = todayRoutineDetail?.name || todayProgramDay?.routineName || 'Scheduled Workout';
+    const routineName =
+      todayRoutineDetail?.name || todayProgramDay?.routineName || t('home.scheduledWorkout');
     const exercisesText = todayRoutineDetail?.exerciseCount
-      ? `${todayRoutineDetail.exerciseCount} exercises · ~${todayRoutineDetail.estimatedMinutes ?? 45} min`
-      : 'Scheduled for today';
+      ? `${todayRoutineDetail.exerciseCount} ${t('home.exercisesCount')} · ~${
+          todayRoutineDetail.estimatedMinutes ?? 45
+        } min`
+      : t('home.scheduledForToday');
 
     return (
-      <View className="bg-brand-surface rounded-3xl p-6 mb-10 border border-brand-surfaceBorder">
+      <View
+        style={{
+          backgroundColor: colors.brand.surface,
+          borderColor: colors.brand.surfaceBorder,
+        }}
+        className="rounded-3xl p-6 mb-10 border"
+      >
         <View className="flex-row items-center mb-3">
-          <View className="bg-brand-surfaceAlt rounded-full p-2 mr-3">
-            <Ionicons name="flash-outline" size={18} color={Colors.brand.primary} />
+          <View
+            style={{ backgroundColor: colors.brand.surfaceAlt }}
+            className="rounded-full p-2 mr-3"
+          >
+            <Ionicons name="flash-outline" size={18} color={colors.brand.primary} />
           </View>
-          <Text className="text-content-secondary text-sm font-medium tracking-wide">
-            TODAY&apos;S TRAINING
-          </Text>
+          <AppText
+            style={{ color: colors.content.secondary }}
+            className="text-sm font-medium tracking-wide uppercase"
+          >
+            {t('home.todaysTraining')}
+          </AppText>
         </View>
 
-        <Text className="text-brand-primary text-2xl font-bold mb-1" numberOfLines={1}>
+        <AppText
+          weight="bold"
+          style={{ color: colors.content.primary }}
+          className="text-2xl font-bold mb-1"
+          numberOfLines={1}
+        >
           {routineName}
-        </Text>
-        <Text className="text-content-secondary text-base mb-6">
+        </AppText>
+        <AppText
+          style={{ color: colors.content.secondary }}
+          className="text-base mb-6"
+        >
           {exercisesText}
-        </Text>
+        </AppText>
 
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleStartTodayWorkout}
-          className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center"
+          style={{ backgroundColor: colors.brand.primary }}
+          className="rounded-xl py-4 flex-row items-center justify-center"
         >
-          <Ionicons name="play" size={16} color={Colors.brand.background} />
-          <Text className="text-brand-background text-base font-semibold ml-2">
-            Start Workout
-          </Text>
+          <Ionicons name="play" size={16} color={colors.brand.background} />
+          <AppText
+            weight="bold"
+            style={{ color: colors.brand.background }}
+            className="text-base font-semibold ml-2"
+          >
+            {t('home.startWorkout')}
+          </AppText>
         </TouchableOpacity>
       </View>
     );
@@ -327,62 +365,126 @@ export default function HomeScreen() {
 
   /** Rest-day motivational card */
   const renderRestDay = () => (
-    <View className="bg-brand-surface rounded-3xl p-6 mb-10 border border-brand-surfaceBorder items-center">
-      <View className="bg-brand-surfaceAlt rounded-full p-4 mb-4">
-        <Ionicons name="moon-outline" size={28} color={Colors.brand.primary} />
+    <View
+      style={{
+        backgroundColor: colors.brand.surface,
+        borderColor: colors.brand.surfaceBorder,
+      }}
+      className="rounded-3xl p-6 mb-10 border items-center"
+    >
+      <View
+        style={{ backgroundColor: colors.brand.surfaceAlt }}
+        className="rounded-full p-4 mb-4"
+      >
+        <Ionicons name="moon-outline" size={28} color={colors.brand.primary} />
       </View>
-      <Text className="text-brand-primary text-2xl font-bold mb-1">Rest Day</Text>
-      <Text className="text-content-secondary text-base text-center mb-6">
-        Recovery is part of progress.{'\n'}Take it easy and come back stronger.
-      </Text>
+      <AppText
+        weight="bold"
+        style={{ color: colors.content.primary }}
+        className="text-2xl font-bold mb-1"
+      >
+        {t('home.restDay')}
+      </AppText>
+      <AppText
+        style={{ color: colors.content.secondary }}
+        className="text-base text-center mb-6"
+      >
+        {t('home.restDaySubtitle')}
+      </AppText>
 
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={handleStartFreestyle}
-        className="bg-brand-surfaceAlt rounded-xl py-4 px-8 flex-row items-center justify-center border border-brand-surfaceBorder"
+        style={{
+          backgroundColor: colors.brand.surfaceAlt,
+          borderColor: colors.brand.surfaceBorder,
+        }}
+        className="rounded-xl py-4 px-8 flex-row items-center justify-center border"
       >
-        <Ionicons name="barbell-outline" size={16} color={Colors.brand.primary} />
-        <Text className="text-brand-primary text-base font-semibold ml-2">
-          Start a Freestyle Workout
-        </Text>
+        <Ionicons name="barbell-outline" size={16} color={colors.brand.primary} />
+        <AppText
+          weight="bold"
+          style={{ color: colors.content.primary }}
+          className="text-base font-semibold ml-2"
+        >
+          {t('home.startFreestyle')}
+        </AppText>
       </TouchableOpacity>
     </View>
   );
 
   /** Loading state for today's card to avoid flickering */
   const renderTodayLoading = () => (
-    <View className="bg-brand-surface rounded-3xl p-8 mb-10 border border-brand-surfaceBorder items-center justify-center min-h-[200px]">
-      <ActivityIndicator size="small" color={Colors.brand.primary} />
-      <Text className="text-content-secondary text-sm mt-3">Loading today&apos;s workout...</Text>
+    <View
+      style={{
+        backgroundColor: colors.brand.surface,
+        borderColor: colors.brand.surfaceBorder,
+      }}
+      className="rounded-3xl p-8 mb-10 border items-center justify-center min-h-[200px]"
+    >
+      <ActivityIndicator size="small" color={colors.brand.primary} />
+      <AppText
+        style={{ color: colors.content.secondary }}
+        className="text-sm mt-3"
+      >
+        {t('home.loadingWorkout')}
+      </AppText>
     </View>
   );
 
   /** Prominent card for the last-created routine */
   const renderLastCreatedCard = (routine: RoutineSummary) => (
-    <View className="bg-brand-surface rounded-3xl p-6 mb-4 border border-brand-surfaceBorder">
+    <View
+      style={{
+        backgroundColor: colors.brand.surface,
+        borderColor: colors.brand.surfaceBorder,
+      }}
+      className="rounded-3xl p-6 mb-4 border"
+    >
       <View className="flex-row items-center mb-3">
-        <View className="bg-brand-surfaceAlt rounded-full p-2 mr-3">
-          <Ionicons name="flash-outline" size={18} color={Colors.brand.primary} />
+        <View
+          style={{ backgroundColor: colors.brand.surfaceAlt }}
+          className="rounded-full p-2 mr-3"
+        >
+          <Ionicons name="flash-outline" size={18} color={colors.brand.primary} />
         </View>
-        <Text className="text-content-secondary text-sm font-medium tracking-wide">
-          LAST CREATED ROUTINE
-        </Text>
+        <AppText
+          style={{ color: colors.content.secondary }}
+          className="text-sm font-medium tracking-wide uppercase"
+        >
+          {t('home.lastCreatedRoutine')}
+        </AppText>
       </View>
-      <Text className="text-brand-primary text-2xl font-bold mb-1" numberOfLines={1}>
+      <AppText
+        weight="bold"
+        style={{ color: colors.content.primary }}
+        className="text-2xl font-bold mb-1"
+        numberOfLines={1}
+      >
         {routine.name}
-      </Text>
-      <Text className="text-content-secondary text-base mb-6">
-        Created {routine.createdAt ? new Date(routine.createdAt).toLocaleDateString() : ''}
-      </Text>
+      </AppText>
+      <AppText
+        style={{ color: colors.content.secondary }}
+        className="text-base mb-6"
+      >
+        {routine.createdAt
+          ? t('home.createdOn', { date: new Date(routine.createdAt).toLocaleDateString() })
+          : ''}
+      </AppText>
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => handleStartLastCreated(routine)}
-        className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center"
+        style={{ backgroundColor: colors.brand.primary }}
+        className="rounded-xl py-4 flex-row items-center justify-center"
       >
-        <Ionicons name="play" size={16} color={Colors.brand.background} />
-        <Text className="text-brand-background text-base font-semibold ml-2">
-          Start
-        </Text>
+        <Ionicons name="play" size={16} color={colors.brand.background} />
+        <AppText
+          weight="bold"
+          style={{ color: colors.brand.background }}
+          className="text-base font-semibold ml-2"
+        >
+          {t('home.start')}
+        </AppText>
       </TouchableOpacity>
     </View>
   );
@@ -391,21 +493,36 @@ export default function HomeScreen() {
   const renderRoutineItem = (routine: RoutineSummary) => (
     <View
       key={routine.id}
-      className="bg-brand-surface rounded-2xl p-5 mb-4 border border-brand-surfaceBorder"
+      style={{
+        backgroundColor: colors.brand.surface,
+        borderColor: colors.brand.surfaceBorder,
+      }}
+      className="rounded-2xl p-5 mb-4 border"
     >
       <View className="flex-row items-start">
-        <View className="bg-brand-surfaceAlt rounded-xl p-3 mr-4">
-          <Ionicons name="barbell-outline" size={22} color={Colors.brand.primary} />
+        <View
+          style={{ backgroundColor: colors.brand.surfaceAlt }}
+          className="rounded-xl p-3 mr-4"
+        >
+          <Ionicons name="barbell-outline" size={22} color={colors.brand.primary} />
         </View>
         <View className="flex-1 justify-center">
-          <Text className="text-brand-primary text-lg font-semibold" numberOfLines={1}>
+          <AppText
+            weight="bold"
+            style={{ color: colors.content.primary }}
+            className="text-lg font-semibold"
+            numberOfLines={1}
+          >
             {routine.name}
-          </Text>
-          <Text className="text-content-secondary text-sm mt-1">
-            {routine.routinePrivate ? 'Private' : 'Public'} routine
-          </Text>
+          </AppText>
+          <AppText
+            style={{ color: colors.content.secondary }}
+            className="text-sm mt-1"
+          >
+            {routine.routinePrivate ? t('home.privateRoutine') : t('home.publicRoutine')}
+          </AppText>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={Colors.content.tertiary} />
+        <Ionicons name="chevron-forward" size={18} color={colors.content.tertiary} />
       </View>
     </View>
   );
@@ -413,36 +530,60 @@ export default function HomeScreen() {
   /** Empty-state with actionable buttons */
   const renderEmptyState = () => (
     <View className="items-center mt-10 px-4">
-      <View className="bg-brand-surfaceAlt rounded-full p-5 mb-5">
-        <Ionicons name="barbell-outline" size={40} color={Colors.content.tertiary} />
+      <View
+        style={{ backgroundColor: colors.brand.surfaceAlt }}
+        className="rounded-full p-5 mb-5"
+      >
+        <Ionicons name="barbell-outline" size={40} color={colors.content.tertiary} />
       </View>
 
-      <Text className="text-brand-primary text-xl font-bold mb-2">No routines yet</Text>
-      <Text className="text-content-secondary text-base text-center mb-8">
-        Create your first routine or browse the catalog to get started on your fitness
-        journey.
-      </Text>
+      <AppText
+        weight="bold"
+        style={{ color: colors.content.primary }}
+        className="text-xl font-bold mb-2"
+      >
+        {t('home.noRoutinesTitle')}
+      </AppText>
+      <AppText
+        style={{ color: colors.content.secondary }}
+        className="text-base text-center mb-8"
+      >
+        {t('home.noRoutinesSubtitle')}
+      </AppText>
 
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => router.push('/routines')}
-        className="bg-brand-surfaceAlt rounded-xl py-4 px-8 flex-row items-center justify-center border border-brand-surfaceBorder mb-3 w-full"
+        style={{
+          backgroundColor: colors.brand.surfaceAlt,
+          borderColor: colors.brand.surfaceBorder,
+        }}
+        className="rounded-xl py-4 px-8 flex-row items-center justify-center border mb-3 w-full"
       >
-        <Ionicons name="search-outline" size={16} color={Colors.brand.primary} />
-        <Text className="text-brand-primary text-base font-semibold ml-2">
-          Browse Catalog
-        </Text>
+        <Ionicons name="search-outline" size={16} color={colors.brand.primary} />
+        <AppText
+          weight="bold"
+          style={{ color: colors.brand.primary }}
+          className="text-base font-semibold ml-2"
+        >
+          {t('home.browseCatalog')}
+        </AppText>
       </TouchableOpacity>
 
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => router.push('/routines')}
-        className="bg-brand-primary rounded-xl py-4 px-8 flex-row items-center justify-center w-full"
+        style={{ backgroundColor: colors.brand.primary }}
+        className="rounded-xl py-4 px-8 flex-row items-center justify-center w-full"
       >
-        <Ionicons name="add-circle-outline" size={16} color={Colors.brand.background} />
-        <Text className="text-brand-background text-base font-semibold ml-2">
-          Create My First Routine
-        </Text>
+        <Ionicons name="add-circle-outline" size={16} color={colors.brand.background} />
+        <AppText
+          weight="bold"
+          style={{ color: colors.brand.background }}
+          className="text-base font-semibold ml-2"
+        >
+          {t('home.createFirstRoutine')}
+        </AppText>
       </TouchableOpacity>
     </View>
   );
@@ -450,17 +591,28 @@ export default function HomeScreen() {
   // ── Main render ───────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView className="flex-1 bg-brand-background" edges={['top']}>
+    <SafeAreaView
+      style={{ backgroundColor: colors.brand.background }}
+      className="flex-1"
+      edges={['top']}
+    >
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="px-6 pb-8">
           {/* ── Header ─────────────────────────────────────────────────── */}
           <View className="mt-4 mb-6">
-            <Text className="text-content-secondary text-base">
-              Hello, {userName || 'User'}
-            </Text>
-            <Text className="text-brand-primary text-3xl font-bold mt-1">
-              Ready to train
-            </Text>
+            <AppText
+              style={{ color: colors.content.secondary }}
+              className="text-base"
+            >
+              {t('home.greeting', { name: userName || 'Athlete' })}
+            </AppText>
+            <AppText
+              weight="bold"
+              style={{ color: colors.content.primary }}
+              className="text-3xl font-bold mt-1"
+            >
+              {t('home.readyToTrain')}
+            </AppText>
           </View>
 
           {/* ── Active Workout Resume Banner ────────────────────────────── */}
@@ -468,24 +620,49 @@ export default function HomeScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => router.push('/active-workout')}
-              className="bg-status-info/15 border border-status-info/40 rounded-2xl p-4 mb-6 flex-row items-center justify-between"
+              style={{
+                backgroundColor: colors.status.info + '15',
+                borderColor: colors.status.info + '40',
+              }}
+              className="border rounded-2xl p-4 mb-6 flex-row items-center justify-between"
             >
               <View className="flex-row items-center flex-1 mr-3">
-                <View className="w-10 h-10 rounded-full bg-status-info/20 items-center justify-center mr-3">
-                  <Ionicons name="pulse" size={20} color={Colors.status.infoLight} />
+                <View
+                  style={{ backgroundColor: colors.status.info + '20' }}
+                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                >
+                  <Ionicons name="pulse" size={20} color={colors.status.infoLight} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-status-infoLight text-xs font-bold uppercase tracking-wider">
-                    Entrenamiento en curso
-                  </Text>
-                  <Text className="text-brand-primary text-base font-bold" numberOfLines={1}>
+                  <AppText
+                    weight="bold"
+                    style={{ color: colors.status.infoLight }}
+                    className="text-xs font-bold uppercase tracking-wider"
+                  >
+                    {t('home.workoutInProgress')}
+                  </AppText>
+                  <AppText
+                    weight="bold"
+                    style={{ color: colors.brand.primary }}
+                    className="text-base font-bold"
+                    numberOfLines={1}
+                  >
                     {activeSession.name}
-                  </Text>
+                  </AppText>
                 </View>
               </View>
-              <View className="bg-status-info py-2 px-3.5 rounded-xl flex-row items-center">
-                <Text className="text-white text-xs font-bold mr-1">Reanudar</Text>
-                <Ionicons name="arrow-forward" size={12} color="#ffffff" />
+              <View
+                style={{ backgroundColor: colors.status.info }}
+                className="py-2 px-3.5 rounded-xl flex-row items-center"
+              >
+                <AppText
+                  weight="bold"
+                  style={{ color: colors.content.primary }}
+                  className="text-xs font-bold mr-1"
+                >
+                  {t('home.resume')}
+                </AppText>
+                <Ionicons name="arrow-forward" size={12} color={colors.content.primary} />
               </View>
             </TouchableOpacity>
           )}
@@ -497,17 +674,21 @@ export default function HomeScreen() {
           {isLoadingProgram
             ? renderTodayLoading()
             : hasWorkoutToday
-              ? renderTodayWorkout()
-              : renderRestDay()}
+            ? renderTodayWorkout()
+            : renderRestDay()}
 
           {/* ── Recent Routines ─────────────────────────────────────────── */}
           {isLoadingRoutines ? (
-            <ActivityIndicator className="mt-10" color={Colors.brand.primary} size="large" />
+            <ActivityIndicator className="mt-10" color={colors.brand.primary} size="large" />
           ) : routines.length > 0 ? (
             <>
-              <Text className="text-brand-primary text-xl font-semibold mb-4">
-                Recent Routines
-              </Text>
+              <AppText
+                weight="bold"
+                style={{ color: colors.content.primary }}
+                className="text-xl font-semibold mb-4"
+              >
+                {t('home.recentRoutines')}
+              </AppText>
 
               {firstRoutine && renderLastCreatedCard(firstRoutine)}
 

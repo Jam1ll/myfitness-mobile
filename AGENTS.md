@@ -19,23 +19,59 @@ npx expo lint               # lint
 npx tsc --noEmit            # typecheck
 npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
-```
-
 Run lint and typecheck before declaring any task done.
 
-## Navigation & Routing
+Navigation & Routing
+Use Expo Router for all navigation. Routes live in src/app/ — every file there is a screen, _layout.tsx files define navigators. Keep non-route code (components, hooks, utils) outside src/app/.
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
+Import Link, router, and useLocalSearchParams from expo-router.
 
-## Building with EAS
+Docs: https://docs.expo.dev/router/introduction.md
 
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
+Building with EAS
+Use EAS to build, sign, and submit the app in the cloud (eas build, eas submit) and to ship over-the-air updates (eas update) — no local Xcode or Android Studio required. Run EAS CLI as bunx eas-cli <command> in Bun projects, or npx eas-cli@latest <command> otherwise; substitute that for bare eas in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 
-## Rules
+Rules
+If ios/ and android/ directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in app.json and config plugins.
 
-- If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: npx expo run:ios|android locally, or eas build --profile development.
+
+Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+MyFitness Custom Architecture (UI & i18n Refactoring)
+When asked to update, refactor, or translate an existing screen in this project, strictly follow these architectural rules:
+
+Typography (AppText):
+
+NEVER use standard React Native <Text> components.
+
+Replace all <Text> imports with the custom <AppText> wrapper from @/components/common/AppText.
+
+Map existing fontWeight styles to weight="bold" or weight="regular" props on <AppText>.
+
+Internationalization (i18n):
+
+Import: import { useTranslation } from 'react-i18next';
+
+Hook: const { t } = useTranslation();
+
+Replace ALL hardcoded strings in the UI with {t('moduleName.keyName')}.
+
+ALWAYS provide a JSON snippet in your output showing the exact keys that need to be added to the src/i18n/locales/ files (e.g., en.json, es.json). Do not assume the keys exist.
+
+Theming:
+
+Do not use hardcoded hex colors (e.g., #FFFFFF or #000000).
+
+Import: import { useTheme } from '@/theme/ThemeProvider';
+
+Hook: const { colors } = useTheme();
+
+Apply colors using the token system (e.g., colors.brand.background, colors.content.primary, colors.brand.surface).
+
+Logic Preservation:
+
+Preserve all existing Zustand state logic, Axios API calls, and NativeWind/Tailwind className structures.
+
+Only modify conditional rendering if strictly required for the UI update.

@@ -1,14 +1,15 @@
+import AppText from '@/components/common/AppText';
 import { useWorkoutStore } from '@/store/useWorkoutStore';
-import { Colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeProvider';
 import type { ExerciseSet } from '@/types/session';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
-  Text,
   TextInput,
   TouchableOpacity,
   useWindowDimensions,
@@ -45,6 +46,9 @@ export default function ActiveExerciseModal({
   nextExerciseName,
   onSelectNextExercise,
 }: ActiveExerciseModalProps) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   const activeSession = useWorkoutStore((s) => s.activeSession);
   const updateSet = useWorkoutStore((s) => s.updateSet);
   const addSetToExercise = useWorkoutStore((s) => s.addSetToExercise);
@@ -68,7 +72,7 @@ export default function ActiveExerciseModal({
 
   const [weightText, setWeightText] = useState('');
   const [repsText, setRepsText] = useState('');
-  const [rpeText, setRpeText] = useState('8'); // RPE por defecto por si lo dejan vacío
+  const [rpeText, setRpeText] = useState('8');
 
   const initializedExerciseRef = useRef<number | null>(null);
 
@@ -111,7 +115,9 @@ export default function ActiveExerciseModal({
       return;
     }
 
-    if (initializedExerciseRef.current === exerciseIndex) return;
+    if (initializedExerciseRef.current === exerciseIndex) {
+      return;
+    }
     initializedExerciseRef.current = exerciseIndex;
 
     const sets = exercise.sets || [];
@@ -138,14 +144,18 @@ export default function ActiveExerciseModal({
         setRpeText('8');
       }
     }
-  }, [isVisible, exerciseIndex]);
+  }, [isVisible, exerciseIndex, exercise, loadSetData, unit]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
     if (isVisible && phase === 'ACTIVE') {
-      interval = setInterval(() => setTutSeconds((prev) => prev + 1), 1000);
+      interval = setInterval(() => {
+        setTutSeconds((prev) => prev + 1);
+      }, 1000);
     }
-    return () => { if (interval) clearInterval(interval); };
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [isVisible, phase]);
 
   useEffect(() => {
@@ -164,7 +174,9 @@ export default function ActiveExerciseModal({
         });
       }, 1000);
     }
-    return () => { if (interval) clearInterval(interval); };
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [isVisible, phase, restSeconds, setIsResting, setRestTimeRemaining]);
 
   const handleStartSet = () => {
@@ -193,7 +205,9 @@ export default function ActiveExerciseModal({
     setRestSeconds((prev) => {
       const updated = Math.max(0, prev + delta);
       setRestTimeRemaining(updated);
-      if (updated > totalRestDuration) setTotalRestDuration(updated);
+      if (updated > totalRestDuration) {
+        setTotalRestDuration(updated);
+      }
       return updated;
     });
   };
@@ -228,6 +242,7 @@ export default function ActiveExerciseModal({
         }
       }
     }
+
     setUnit(newUnit);
   };
 
@@ -253,21 +268,29 @@ export default function ActiveExerciseModal({
   const handleSaveSet = () => {
     if (!exercise) return;
 
-    let finalWeight: number = 0;
-    if (unit !== 'BODYWEIGHT') {
+    let finalWeight: number | null = null;
+    if (unit === 'BODYWEIGHT') {
+      finalWeight = null;
+    } else {
       const sanitized = weightText.replace(',', '.').trim();
-      const parsed = parseFloat(sanitized);
-      if (!isNaN(parsed)) {
-        finalWeight = unit === 'LBS' ? Number((parsed * LB_TO_KG).toFixed(2)) : parsed;
+      if (sanitized) {
+        const parsed = parseFloat(sanitized);
+        if (!isNaN(parsed)) {
+          finalWeight = unit === 'LBS' ? Number((parsed * LB_TO_KG).toFixed(2)) : parsed;
+        }
       }
     }
 
-    const finalReps = parseInt(repsText.trim(), 10) || 0;
-    const finalRpe = parseFloat(rpeText.replace(',', '.').trim()) || 8; // Obligatorio para Spring Boot
+    const sanitizedReps = repsText.trim();
+    const finalReps = sanitizedReps ? parseInt(sanitizedReps, 10) : null;
+
+    const sanitizedRpe = rpeText.replace(',', '.').trim();
+    const parsedRpe = parseFloat(sanitizedRpe);
+    const finalRpe = !isNaN(parsedRpe) ? parsedRpe : 8;
 
     updateSet(exerciseIndex, currentSetIndex, {
       weight: finalWeight,
-      reps: finalReps,
+      reps: isNaN(finalReps as number) ? null : finalReps,
       rpe: finalRpe,
       completed: true,
     });
@@ -328,32 +351,84 @@ export default function ActiveExerciseModal({
   const restRadius = tutRadius * 0.9;
 
   return (
-    <Modal visible={isVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView className="flex-1 bg-brand-background" edges={['top', 'bottom']}>
-
-        <View className="px-5 py-4 border-b border-brand-surfaceBorder flex-row items-center justify-between">
-          <TouchableOpacity activeOpacity={0.7} onPress={onClose} className="w-10 h-10 rounded-full bg-brand-surfaceAlt items-center justify-center border border-brand-surfaceBorder">
-            <Ionicons name="close" size={24} color={Colors.content.primary} />
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView
+        style={{ backgroundColor: colors.brand.background }}
+        className="flex-1"
+        edges={['top', 'bottom']}
+      >
+        <View
+          style={{
+            borderBottomColor: colors.brand.surfaceBorder,
+            backgroundColor: colors.brand.surface,
+          }}
+          className="px-5 py-4 border-b flex-row items-center justify-between"
+        >
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={onClose}
+            style={{
+              backgroundColor: colors.brand.surfaceAlt,
+              borderColor: colors.brand.surfaceBorder,
+            }}
+            className="w-10 h-10 rounded-full items-center justify-center border"
+          >
+            <Ionicons name="close" size={24} color={colors.content.primary} />
           </TouchableOpacity>
           <View className="items-center">
-            <Text className="text-content-secondary text-[11px] font-bold uppercase tracking-wider">
-              Exercise {exerciseIndex + 1} of {totalExercises}
-            </Text>
-            <Text className="text-brand-primary text-lg font-bold" numberOfLines={1}>{exercise.name}</Text>
+            <AppText
+              weight="bold"
+              style={{ color: colors.content.secondary }}
+              className="text-[11px] font-bold uppercase tracking-wider"
+            >
+              {t('activeExercise.exerciseOf', {
+                current: exerciseIndex + 1,
+                total: totalExercises,
+              })}
+            </AppText>
+            <AppText
+              weight="bold"
+              style={{ color: colors.brand.primary }}
+              className="text-lg font-bold"
+              numberOfLines={1}
+            >
+              {exercise.name}
+            </AppText>
           </View>
           {restSeconds > 0 ? (
-            <View className="flex-row items-center bg-status-info/20 px-3 py-1.5 rounded-full border border-status-info/30">
-              <Ionicons name="timer-outline" size={14} color={Colors.status.infoLight} />
-              <Text className="text-status-infoLight text-sm font-bold ml-1 font-mono">
+            <View
+              style={{
+                backgroundColor: colors.status.info + '20',
+                borderColor: colors.status.info + '30',
+              }}
+              className="flex-row items-center px-3 py-1.5 rounded-full border"
+            >
+              <Ionicons name="timer-outline" size={14} color={colors.status.infoLight} />
+              <AppText
+                weight="bold"
+                style={{ color: colors.status.infoLight }}
+                className="text-sm font-bold ml-1 font-mono"
+              >
                 {formatStopwatch(restSeconds)}
-              </Text>
+              </AppText>
             </View>
           ) : (
             <View className="w-10" />
           )}
         </View>
 
-        <View className="px-5 py-3 border-b border-brand-surfaceBorder/60 bg-brand-surface/40">
+        <View
+          style={{
+            borderBottomColor: colors.brand.surfaceBorder + '60',
+            backgroundColor: colors.brand.surface + '80',
+          }}
+          className="px-5 py-3 border-b"
+        >
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
             {exercise.sets.map((s, idx) => {
               const isCurrent = idx === currentSetIndex;
@@ -363,70 +438,207 @@ export default function ActiveExerciseModal({
                   key={idx}
                   activeOpacity={0.8}
                   onPress={() => handleSelectSet(idx)}
-                  className={`flex-row items-center py-2 px-4 rounded-full mr-2 border ${isCurrent ? 'bg-brand-primary border-brand-primary' : isCompleted ? 'bg-status-info/20 border-status-info/40' : 'bg-brand-surfaceAlt border-brand-surfaceBorder'}`}
+                  style={{
+                    backgroundColor: isCurrent
+                      ? colors.brand.primary
+                      : isCompleted
+                      ? colors.status.info + '20'
+                      : colors.brand.surfaceAlt,
+                    borderColor: isCurrent
+                      ? colors.brand.primary
+                      : isCompleted
+                      ? colors.status.info + '40'
+                      : colors.brand.surfaceBorder,
+                  }}
+                  className="flex-row items-center py-2 px-4 rounded-full mr-2 border"
                 >
-                  {isCompleted && <Ionicons name="checkmark-circle" size={16} color={isCurrent ? Colors.brand.background : Colors.status.infoLight} style={{ marginRight: 4 }} />}
-                  <Text className={`text-sm font-bold ${isCurrent ? 'text-brand-background' : isCompleted ? 'text-status-infoLight' : 'text-content-secondary'}`}>
-                    Set {s.setNumber}
-                  </Text>
+                  {isCompleted && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color={isCurrent ? colors.brand.background : colors.status.infoLight}
+                      style={{ marginRight: 4 }}
+                    />
+                  )}
+                  <AppText
+                    weight="bold"
+                    style={{
+                      color: isCurrent
+                        ? colors.brand.background
+                        : isCompleted
+                        ? colors.status.infoLight
+                        : colors.content.secondary,
+                    }}
+                    className="text-sm font-bold"
+                  >
+                    {t('activeExercise.setNumber', { number: s.setNumber })}
+                  </AppText>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-          <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingVertical: 16 }} keyboardShouldPersistTaps="handled">
-
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          className="flex-1"
+        >
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingVertical: 16 }}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* ════ PHASE A: READY ════ */}
             {phase === 'READY' && (
               <View className="flex-1 items-center justify-between py-4">
                 <View className="items-center w-full">
-                  <View className="bg-brand-surfaceAlt/80 border border-brand-surfaceBorder px-5 py-2 rounded-full mb-3">
-                    <Text className="text-content-secondary text-sm font-bold uppercase tracking-wider">
-                      Set {currentSetIndex + 1} of {exercise.sets.length}
-                    </Text>
+                  <View
+                    style={{
+                      backgroundColor: colors.brand.surfaceAlt + '80',
+                      borderColor: colors.brand.surfaceBorder,
+                    }}
+                    className="border px-5 py-2 rounded-full mb-3"
+                  >
+                    <AppText
+                      weight="bold"
+                      style={{ color: colors.content.secondary }}
+                      className="text-sm font-bold uppercase tracking-wider"
+                    >
+                      {t('activeExercise.setOf', {
+                        current: currentSetIndex + 1,
+                        total: exercise.sets.length,
+                      })}
+                    </AppText>
                   </View>
-                  <Text className="text-brand-primary text-4xl font-extrabold text-center px-2">{exercise.name}</Text>
+                  <AppText
+                    weight="bold"
+                    style={{ color: colors.brand.primary }}
+                    className="text-4xl font-extrabold text-center px-2"
+                  >
+                    {exercise.name}
+                  </AppText>
 
                   {restSeconds > 0 && (
-                    <View className="w-full bg-status-info/10 border border-status-info/30 rounded-2xl p-4 mt-5 flex-row items-center justify-between">
+                    <View
+                      style={{
+                        backgroundColor: colors.status.info + '15',
+                        borderColor: colors.status.info + '30',
+                      }}
+                      className="w-full border rounded-2xl p-4 mt-5 flex-row items-center justify-between"
+                    >
                       <View className="flex-row items-center">
-                        <Ionicons name="timer-outline" size={24} color={Colors.status.infoLight} />
+                        <Ionicons
+                          name="timer-outline"
+                          size={24}
+                          color={colors.status.infoLight}
+                        />
                         <View className="ml-3">
-                          <Text className="text-brand-primary text-sm font-bold">Resting in progress</Text>
-                          <Text className="text-status-infoLight text-base font-extrabold font-mono">
-                            {formatStopwatch(restSeconds)} remaining
-                          </Text>
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="text-sm font-bold"
+                          >
+                            {t('activeExercise.restingInProgress')}
+                          </AppText>
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.status.infoLight }}
+                            className="text-base font-extrabold font-mono"
+                          >
+                            {t('activeExercise.remaining', {
+                              time: formatStopwatch(restSeconds),
+                            })}
+                          </AppText>
                         </View>
                       </View>
-                      <TouchableOpacity onPress={handleSkipRest} className="bg-brand-surface px-4 py-2 rounded-lg border border-brand-surfaceBorder">
-                        <Text className="text-content-primary text-sm font-semibold">Skip</Text>
+                      <TouchableOpacity
+                        onPress={handleSkipRest}
+                        style={{
+                          backgroundColor: colors.brand.surface,
+                          borderColor: colors.brand.surfaceBorder,
+                        }}
+                        className="px-4 py-2 rounded-lg border"
+                      >
+                        <AppText
+                          weight="semibold"
+                          style={{ color: colors.content.primary }}
+                          className="text-sm font-semibold"
+                        >
+                          {t('activeExercise.skip')}
+                        </AppText>
                       </TouchableOpacity>
                     </View>
                   )}
 
                   {prevSet && (
-                    <View className="w-full bg-brand-surface rounded-2xl p-5 mt-4 border border-brand-surfaceBorder flex-row items-center justify-between">
+                    <View
+                      style={{
+                        backgroundColor: colors.brand.surface,
+                        borderColor: colors.brand.surfaceBorder,
+                      }}
+                      className="w-full rounded-2xl p-5 mt-4 border flex-row items-center justify-between"
+                    >
                       <View>
-                        <Text className="text-content-secondary text-xs font-bold uppercase tracking-wider">Last Set (#{prevSet.setNumber})</Text>
-                        <Text className="text-brand-primary text-lg font-bold mt-1">
-                          {prevSet.weight !== null ? `${prevSet.weight} kg` : 'Bodyweight'} × {prevSet.reps ?? 0} reps (RPE {prevSet.rpe ?? 8})
-                        </Text>
+                        <AppText
+                          weight="bold"
+                          style={{ color: colors.content.secondary }}
+                          className="text-xs font-bold uppercase tracking-wider"
+                        >
+                          {t('activeExercise.lastSet', { number: prevSet.setNumber })}
+                        </AppText>
+                        <AppText
+                          weight="bold"
+                          style={{ color: colors.brand.primary }}
+                          className="text-lg font-bold mt-1"
+                        >
+                          {prevSet.weight !== null ? `${prevSet.weight} kg` : 'Bodyweight'} ×{' '}
+                          {prevSet.reps ?? 0} reps (RPE {prevSet.rpe ?? 8})
+                        </AppText>
                       </View>
-                      <Ionicons name="checkmark-done" size={28} color={Colors.status.infoLight} />
+                      <Ionicons
+                        name="checkmark-done"
+                        size={28}
+                        color={colors.status.infoLight}
+                      />
                     </View>
                   )}
                 </View>
 
                 <View className="items-center my-8">
-                  <TouchableOpacity activeOpacity={0.85} onPress={handleStartSet} className="w-56 h-56 rounded-full bg-brand-primary items-center justify-center shadow-2xl border-4 border-brand-surfaceAlt">
-                    <Ionicons name="play" size={60} color={Colors.brand.background} style={{ marginLeft: 6 }} />
-                    <Text className="text-brand-background text-2xl font-black mt-2">Start Set</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={handleStartSet}
+                    style={{
+                      backgroundColor: colors.brand.primary,
+                      borderColor: colors.brand.surfaceAlt,
+                    }}
+                    className="w-56 h-56 rounded-full items-center justify-center shadow-2xl border-4"
+                  >
+                    <Ionicons
+                      name="play"
+                      size={60}
+                      color={colors.brand.background}
+                      style={{ marginLeft: 6 }}
+                    />
+                    <AppText
+                      weight="bold"
+                      style={{ color: colors.brand.background }}
+                      className="text-2xl font-black mt-2"
+                    >
+                      {t('activeExercise.startSet')}
+                    </AppText>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => handleSelectSet(currentSetIndex)} className="py-2">
-                  <Text className="text-content-muted text-sm underline">Want to manually log without stopwatch?</Text>
+
+                <TouchableOpacity
+                  onPress={() => handleSelectSet(currentSetIndex)}
+                  className="py-2"
+                >
+                  <AppText
+                    style={{ color: colors.content.muted }}
+                    className="text-sm underline"
+                  >
+                    {t('activeExercise.manualLogHint')}
+                  </AppText>
                 </TouchableOpacity>
               </View>
             )}
@@ -435,158 +647,470 @@ export default function ActiveExerciseModal({
             {phase === 'ACTIVE' && (
               <View className="flex-1 items-center justify-between py-4">
                 <View className="items-center">
-                  <View className="bg-status-info/10 border border-status-info/30 px-5 py-2 rounded-full mb-3">
-                    <Text className="text-status-infoLight text-sm font-bold uppercase tracking-wider">
-                      Recording Set {currentSetIndex + 1}
-                    </Text>
+                  <View
+                    style={{
+                      backgroundColor: colors.status.info + '15',
+                      borderColor: colors.status.info + '30',
+                    }}
+                    className="border px-5 py-2 rounded-full mb-3"
+                  >
+                    <AppText
+                      weight="bold"
+                      style={{ color: colors.status.infoLight }}
+                      className="text-sm font-bold uppercase tracking-wider"
+                    >
+                      {t('activeExercise.recordingSet', { current: currentSetIndex + 1 })}
+                    </AppText>
                   </View>
-                  <Text className="text-brand-primary text-3xl font-bold text-center">{exercise.name}</Text>
+                  <AppText
+                    weight="bold"
+                    style={{ color: colors.brand.primary }}
+                    className="text-3xl font-bold text-center"
+                  >
+                    {exercise.name}
+                  </AppText>
                 </View>
 
-                <View style={{ alignItems: 'center', justifyContent: 'center', marginVertical: tutDiameter * 0.08 }}>
-                  <View style={{ width: tutDiameter, height: tutDiameter, alignItems: 'center', justifyContent: 'center' }}>
+                <View
+                  style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginVertical: tutDiameter * 0.08,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: tutDiameter,
+                      height: tutDiameter,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <View style={{ position: 'absolute', top: 0, left: 0 }}>
                       <CircularProgressBase
                         value={tutSeconds % 60}
                         maxValue={60}
                         radius={tutRadius}
                         duration={1000}
-                        activeStrokeColor={Colors.status.info}
-                        inActiveStrokeColor={Colors.brand.surfaceBorder}
+                        activeStrokeColor={colors.status.info}
+                        inActiveStrokeColor={colors.brand.surfaceBorder}
                         activeStrokeWidth={tutStrokeWidth}
                         inActiveStrokeWidth={tutStrokeWidth}
                       />
                     </View>
                     <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: tutFontSize, fontWeight: '900', color: Colors.brand.primary, fontVariant: ['tabular-nums'], includeFontPadding: false }}>
+                      <AppText
+                        weight="bold"
+                        style={{
+                          fontSize: tutFontSize,
+                          fontWeight: '900',
+                          color: colors.brand.primary,
+                          fontVariant: ['tabular-nums'],
+                          includeFontPadding: false,
+                        }}
+                      >
                         {formatStopwatch(tutSeconds)}
-                      </Text>
-                      <Text style={{ fontSize: tutDiameter * 0.037, fontWeight: 'bold', color: Colors.content?.secondary ?? '#999', letterSpacing: 2, marginTop: tutDiameter * 0.025 }}>
-                        TIME UNDER TENSION
-                      </Text>
+                      </AppText>
+                      <AppText
+                        weight="bold"
+                        style={{
+                          fontSize: tutDiameter * 0.037,
+                          fontWeight: 'bold',
+                          color: colors.content.secondary,
+                          letterSpacing: 2,
+                          marginTop: tutDiameter * 0.025,
+                        }}
+                      >
+                        {t('activeExercise.timeUnderTension')}
+                      </AppText>
                     </View>
                   </View>
                 </View>
 
                 <View className="w-full">
-                  <TouchableOpacity activeOpacity={0.85} onPress={handleFinishSet} className="w-full bg-status-info py-5 rounded-2xl flex-row items-center justify-center shadow-xl">
-                    <Ionicons name="checkmark-done" size={28} color={Colors.brand.primary} />
-                    <Text className="text-brand-primary text-xl font-bold ml-2">Finish Set</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={handleFinishSet}
+                    style={{ backgroundColor: colors.status.info }}
+                    className="w-full py-5 rounded-2xl flex-row items-center justify-center shadow-xl"
+                  >
+                    <Ionicons name="checkmark-done" size={28} color={colors.brand.primary} />
+                    <AppText
+                      weight="bold"
+                      style={{ color: colors.brand.primary }}
+                      className="text-xl font-bold ml-2"
+                    >
+                      {t('activeExercise.finishSet')}
+                    </AppText>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            {/* ════ PHASE C: LOGGING (Incluye Peso, Reps y RPE obligatorio) ════ */}
+            {/* ════ PHASE C: LOGGING ════ */}
             {phase === 'LOGGING' && (
               <View className="flex-1 justify-between py-2">
                 <View>
-                  {/* Cronómetro de Descanso */}
-                  <View style={{ alignItems: 'center', justifyContent: 'center', marginVertical: restDiameter * 0.06 }}>
-                    <View style={{ width: restDiameter, height: restDiameter, alignItems: 'center', justifyContent: 'center' }}>
-
+                  {/* Rest Countdown */}
+                  <View
+                    style={{
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginVertical: restDiameter * 0.06,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: restDiameter,
+                        height: restDiameter,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
                       <View style={{ position: 'absolute', top: 0, left: 0 }}>
                         <CircularProgressBase
                           value={restSeconds}
                           maxValue={totalRestDuration || 60}
                           radius={restRadius}
                           duration={1000}
-                          activeStrokeColor={Colors.status.info}
-                          inActiveStrokeColor={Colors.brand.surfaceBorder}
+                          activeStrokeColor={colors.status.info}
+                          inActiveStrokeColor={colors.brand.surfaceBorder}
                           activeStrokeWidth={tutStrokeWidth}
                           inActiveStrokeWidth={tutStrokeWidth}
                         />
                       </View>
-
                       <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ fontSize: tutFontSize, fontWeight: '900', color: Colors.brand.primary, fontVariant: ['tabular-nums'], includeFontPadding: false }}>
+                        <AppText
+                          weight="bold"
+                          style={{
+                            fontSize: tutFontSize,
+                            fontWeight: '900',
+                            color: colors.brand.primary,
+                            fontVariant: ['tabular-nums'],
+                            includeFontPadding: false,
+                          }}
+                        >
                           {formatStopwatch(restSeconds)}
-                        </Text>
-                        <Text style={{ fontSize: restDiameter * 0.04, fontWeight: 'bold', color: Colors.content.secondary, letterSpacing: 2, marginTop: restDiameter * 0.025 }}>
-                          RESTING
-                        </Text>
+                        </AppText>
+                        <AppText
+                          weight="bold"
+                          style={{
+                            fontSize: restDiameter * 0.04,
+                            fontWeight: 'bold',
+                            color: colors.content.secondary,
+                            letterSpacing: 2,
+                            marginTop: restDiameter * 0.025,
+                          }}
+                        >
+                          {t('activeExercise.resting')}
+                        </AppText>
                       </View>
-
                     </View>
 
                     <View className="flex-row items-center gap-3 mt-6">
-                      <TouchableOpacity activeOpacity={0.7} onPress={() => handleAdjustRest(-15)} className="bg-brand-surfaceAlt px-5 py-3 rounded-xl border border-brand-surfaceBorder">
-                        <Text className="text-brand-primary text-sm font-semibold">-15s</Text>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleAdjustRest(-15)}
+                        style={{
+                          backgroundColor: colors.brand.surfaceAlt,
+                          borderColor: colors.brand.surfaceBorder,
+                        }}
+                        className="px-5 py-3 rounded-xl border"
+                      >
+                        <AppText
+                          weight="semibold"
+                          style={{ color: colors.brand.primary }}
+                          className="text-sm font-semibold"
+                        >
+                          -15s
+                        </AppText>
                       </TouchableOpacity>
-                      <TouchableOpacity activeOpacity={0.8} onPress={handleSkipRest} className="bg-status-info/20 px-6 py-3 rounded-xl border border-status-info/40">
-                        <Text className="text-status-infoLight text-sm font-bold">Skip Rest</Text>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={handleSkipRest}
+                        style={{
+                          backgroundColor: colors.status.info + '20',
+                          borderColor: colors.status.info + '40',
+                        }}
+                        className="px-6 py-3 rounded-xl border"
+                      >
+                        <AppText
+                          weight="bold"
+                          style={{ color: colors.status.infoLight }}
+                          className="text-sm font-bold"
+                        >
+                          {t('activeExercise.skipRest')}
+                        </AppText>
                       </TouchableOpacity>
-                      <TouchableOpacity activeOpacity={0.7} onPress={() => handleAdjustRest(30)} className="bg-brand-surfaceAlt px-5 py-3 rounded-xl border border-brand-surfaceBorder">
-                        <Text className="text-brand-primary text-sm font-semibold">+30s</Text>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleAdjustRest(30)}
+                        style={{
+                          backgroundColor: colors.brand.surfaceAlt,
+                          borderColor: colors.brand.surfaceBorder,
+                        }}
+                        className="px-5 py-3 rounded-xl border"
+                      >
+                        <AppText
+                          weight="semibold"
+                          style={{ color: colors.brand.primary }}
+                          className="text-sm font-semibold"
+                        >
+                          +30s
+                        </AppText>
                       </TouchableOpacity>
                     </View>
                   </View>
 
-                  <View className="flex-row items-center bg-brand-surface p-1.5 rounded-xl mb-4 border border-brand-surfaceBorder">
+                  <View
+                    style={{
+                      backgroundColor: colors.brand.surface,
+                      borderColor: colors.brand.surfaceBorder,
+                    }}
+                    className="flex-row items-center p-1.5 rounded-xl mb-4 border"
+                  >
                     {(['KG', 'LBS', 'BODYWEIGHT'] as const).map((opt) => (
-                      <TouchableOpacity key={opt} activeOpacity={0.8} onPress={() => handleUnitChange(opt)} className={`flex-1 py-3 rounded-lg items-center justify-center ${unit === opt ? 'bg-brand-primary' : 'bg-transparent'}`}>
-                        <Text className={`text-sm font-bold ${unit === opt ? 'text-brand-background' : 'text-content-secondary'}`}>
-                          {opt === 'BODYWEIGHT' ? 'Bodyweight' : opt}
-                        </Text>
+                      <TouchableOpacity
+                        key={opt}
+                        activeOpacity={0.8}
+                        onPress={() => handleUnitChange(opt)}
+                        style={{
+                          backgroundColor: unit === opt ? colors.brand.primary : 'transparent',
+                        }}
+                        className="flex-1 py-3 rounded-lg items-center justify-center"
+                      >
+                        <AppText
+                          weight="bold"
+                          style={{
+                            color:
+                              unit === opt
+                                ? colors.brand.background
+                                : colors.content.secondary,
+                          }}
+                          className="text-sm font-bold"
+                        >
+                          {opt === 'BODYWEIGHT' ? t('activeExercise.bodyweight') : opt}
+                        </AppText>
                       </TouchableOpacity>
                     ))}
                   </View>
 
-                  {/* Fila de Inputs: Peso, Reps y RPE */}
+                  {/* Weight, Reps, RPE */}
                   <View className="flex-row gap-3 mb-6">
                     {/* Weight Box */}
-                    <View className="flex-1 bg-brand-surface p-4 rounded-2xl border border-brand-surfaceBorder">
-                      <Text className="text-content-secondary text-[10px] font-bold uppercase tracking-wider mb-2 text-center">Weight</Text>
+                    <View
+                      style={{
+                        backgroundColor: colors.brand.surface,
+                        borderColor: colors.brand.surfaceBorder,
+                      }}
+                      className="flex-1 p-4 rounded-2xl border"
+                    >
+                      <AppText
+                        weight="bold"
+                        style={{ color: colors.content.secondary }}
+                        className="text-[10px] font-bold uppercase tracking-wider mb-2 text-center"
+                      >
+                        {t('activeExercise.weight')}
+                      </AppText>
                       {unit === 'BODYWEIGHT' ? (
-                        <View className="h-12 bg-brand-surfaceAlt rounded-xl items-center justify-center border border-brand-surfaceBorder">
-                          <Text className="text-content-secondary font-bold text-sm">BW</Text>
+                        <View
+                          style={{
+                            backgroundColor: colors.brand.surfaceAlt,
+                            borderColor: colors.brand.surfaceBorder,
+                          }}
+                          className="h-12 rounded-xl items-center justify-center border"
+                        >
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.content.secondary }}
+                            className="font-bold text-sm"
+                          >
+                            BW
+                          </AppText>
                         </View>
                       ) : (
                         <View className="flex-row items-center justify-between">
-                          <TouchableOpacity onPress={() => handleAdjustWeight(unit === 'LBS' ? -5 : -2.5)} className="w-9 h-9 rounded-xl bg-brand-surfaceAlt items-center justify-center border border-brand-surfaceBorder">
-                            <Text className="text-brand-primary text-lg font-bold">-</Text>
+                          <TouchableOpacity
+                            onPress={() => handleAdjustWeight(unit === 'LBS' ? -5 : -2.5)}
+                            style={{
+                              backgroundColor: colors.brand.surfaceAlt,
+                              borderColor: colors.brand.surfaceBorder,
+                            }}
+                            className="w-9 h-9 rounded-xl items-center justify-center border"
+                          >
+                            <AppText
+                              weight="bold"
+                              style={{ color: colors.brand.primary }}
+                              className="text-lg font-bold"
+                            >
+                              -
+                            </AppText>
                           </TouchableOpacity>
-                          <TextInput value={weightText} onChangeText={setWeightText} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={Colors.content.muted} className="flex-1 text-center text-brand-primary text-xl font-extrabold mx-1" />
-                          <TouchableOpacity onPress={() => handleAdjustWeight(unit === 'LBS' ? 5 : 2.5)} className="w-9 h-9 rounded-xl bg-brand-surfaceAlt items-center justify-center border border-brand-surfaceBorder">
-                            <Text className="text-brand-primary text-lg font-bold">+</Text>
+                          <TextInput
+                            value={weightText}
+                            onChangeText={setWeightText}
+                            keyboardType="decimal-pad"
+                            placeholder="0"
+                            placeholderTextColor={colors.content.muted}
+                            style={{ color: colors.brand.primary }}
+                            className="flex-1 text-center text-xl font-extrabold mx-1"
+                          />
+                          <TouchableOpacity
+                            onPress={() => handleAdjustWeight(unit === 'LBS' ? 5 : 2.5)}
+                            style={{
+                              backgroundColor: colors.brand.surfaceAlt,
+                              borderColor: colors.brand.surfaceBorder,
+                            }}
+                            className="w-9 h-9 rounded-xl items-center justify-center border"
+                          >
+                            <AppText
+                              weight="bold"
+                              style={{ color: colors.brand.primary }}
+                              className="text-lg font-bold"
+                            >
+                              +
+                            </AppText>
                           </TouchableOpacity>
                         </View>
                       )}
                     </View>
 
                     {/* Reps Box */}
-                    <View className="flex-1 bg-brand-surface p-4 rounded-2xl border border-brand-surfaceBorder">
-                      <Text className="text-content-secondary text-[10px] font-bold uppercase tracking-wider mb-2 text-center">Reps</Text>
+                    <View
+                      style={{
+                        backgroundColor: colors.brand.surface,
+                        borderColor: colors.brand.surfaceBorder,
+                      }}
+                      className="flex-1 p-4 rounded-2xl border"
+                    >
+                      <AppText
+                        weight="bold"
+                        style={{ color: colors.content.secondary }}
+                        className="text-[10px] font-bold uppercase tracking-wider mb-2 text-center"
+                      >
+                        {t('activeExercise.reps')}
+                      </AppText>
                       <View className="flex-row items-center justify-between">
-                        <TouchableOpacity onPress={() => handleAdjustReps(-1)} className="w-9 h-9 rounded-xl bg-brand-surfaceAlt items-center justify-center border border-brand-surfaceBorder">
-                          <Text className="text-brand-primary text-lg font-bold">-</Text>
+                        <TouchableOpacity
+                          onPress={() => handleAdjustReps(-1)}
+                          style={{
+                            backgroundColor: colors.brand.surfaceAlt,
+                            borderColor: colors.brand.surfaceBorder,
+                          }}
+                          className="w-9 h-9 rounded-xl items-center justify-center border"
+                        >
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="text-lg font-bold"
+                          >
+                            -
+                          </AppText>
                         </TouchableOpacity>
-                        <TextInput value={repsText} onChangeText={setRepsText} keyboardType="number-pad" placeholder="0" placeholderTextColor={Colors.content.muted} className="flex-1 text-center text-brand-primary text-xl font-extrabold mx-1" />
-                        <TouchableOpacity onPress={() => handleAdjustReps(1)} className="w-9 h-9 rounded-xl bg-brand-surfaceAlt items-center justify-center border border-brand-surfaceBorder">
-                          <Text className="text-brand-primary text-lg font-bold">+</Text>
+                        <TextInput
+                          value={repsText}
+                          onChangeText={setRepsText}
+                          keyboardType="number-pad"
+                          placeholder="0"
+                          placeholderTextColor={colors.content.muted}
+                          style={{ color: colors.brand.primary }}
+                          className="flex-1 text-center text-xl font-extrabold mx-1"
+                        />
+                        <TouchableOpacity
+                          onPress={() => handleAdjustReps(1)}
+                          style={{
+                            backgroundColor: colors.brand.surfaceAlt,
+                            borderColor: colors.brand.surfaceBorder,
+                          }}
+                          className="w-9 h-9 rounded-xl items-center justify-center border"
+                        >
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="text-lg font-bold"
+                          >
+                            +
+                          </AppText>
                         </TouchableOpacity>
                       </View>
                     </View>
 
-                    {/* RPE Box (Obligatorio) */}
-                    <View className="flex-1 bg-brand-surface p-4 rounded-2xl border border-brand-surfaceBorder">
-                      <Text className="text-content-secondary text-[10px] font-bold uppercase tracking-wider mb-2 text-center">RPE (1-10)</Text>
+                    {/* RPE Box */}
+                    <View
+                      style={{
+                        backgroundColor: colors.brand.surface,
+                        borderColor: colors.brand.surfaceBorder,
+                      }}
+                      className="flex-1 p-4 rounded-2xl border"
+                    >
+                      <AppText
+                        weight="bold"
+                        style={{ color: colors.content.secondary }}
+                        className="text-[10px] font-bold uppercase tracking-wider mb-2 text-center"
+                      >
+                        {t('activeExercise.rpe')}
+                      </AppText>
                       <View className="flex-row items-center justify-between">
-                        <TouchableOpacity onPress={() => handleAdjustRpe(-0.5)} className="w-9 h-9 rounded-xl bg-brand-surfaceAlt items-center justify-center border border-brand-surfaceBorder">
-                          <Text className="text-brand-primary text-lg font-bold">-</Text>
+                        <TouchableOpacity
+                          onPress={() => handleAdjustRpe(-0.5)}
+                          style={{
+                            backgroundColor: colors.brand.surfaceAlt,
+                            borderColor: colors.brand.surfaceBorder,
+                          }}
+                          className="w-9 h-9 rounded-xl items-center justify-center border"
+                        >
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="text-lg font-bold"
+                          >
+                            -
+                          </AppText>
                         </TouchableOpacity>
-                        <TextInput value={rpeText} onChangeText={setRpeText} keyboardType="decimal-pad" placeholder="8" placeholderTextColor={Colors.content.muted} className="flex-1 text-center text-brand-primary text-xl font-extrabold mx-1" />
-                        <TouchableOpacity onPress={() => handleAdjustRpe(0.5)} className="w-9 h-9 rounded-xl bg-brand-surfaceAlt items-center justify-center border border-brand-surfaceBorder">
-                          <Text className="text-brand-primary text-lg font-bold">+</Text>
+                        <TextInput
+                          value={rpeText}
+                          onChangeText={setRpeText}
+                          keyboardType="decimal-pad"
+                          placeholder="8"
+                          placeholderTextColor={colors.content.muted}
+                          style={{ color: colors.brand.primary }}
+                          className="flex-1 text-center text-xl font-extrabold mx-1"
+                        />
+                        <TouchableOpacity
+                          onPress={() => handleAdjustRpe(0.5)}
+                          style={{
+                            backgroundColor: colors.brand.surfaceAlt,
+                            borderColor: colors.brand.surfaceBorder,
+                          }}
+                          className="w-9 h-9 rounded-xl items-center justify-center border"
+                        >
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="text-lg font-bold"
+                          >
+                            +
+                          </AppText>
                         </TouchableOpacity>
                       </View>
                     </View>
                   </View>
                 </View>
 
-                <TouchableOpacity activeOpacity={0.85} onPress={handleSaveSet} className="w-full bg-brand-primary py-5 rounded-2xl flex-row items-center justify-center shadow-lg">
-                  <Ionicons name="checkmark" size={24} color={Colors.brand.background} />
-                  <Text className="text-brand-background text-lg font-bold ml-2">Save Set</Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={handleSaveSet}
+                  style={{ backgroundColor: colors.brand.primary }}
+                  className="w-full py-5 rounded-2xl flex-row items-center justify-center shadow-lg"
+                >
+                  <Ionicons name="checkmark" size={24} color={colors.brand.background} />
+                  <AppText
+                    weight="bold"
+                    style={{ color: colors.brand.background }}
+                    className="text-lg font-bold ml-2"
+                  >
+                    {t('activeExercise.saveSet')}
+                  </AppText>
                 </TouchableOpacity>
               </View>
             )}
@@ -596,26 +1120,86 @@ export default function ActiveExerciseModal({
               <View className="flex-1 justify-between py-2">
                 <View>
                   <View className="items-center my-6">
-                    <View className="w-24 h-24 rounded-full bg-status-info/20 items-center justify-center border-2 border-status-info/40 mb-4">
-                      <Ionicons name="trophy-outline" size={48} color={Colors.status.infoLight} />
+                    <View
+                      style={{
+                        backgroundColor: colors.status.info + '20',
+                        borderColor: colors.status.info + '40',
+                      }}
+                      className="w-24 h-24 rounded-full items-center justify-center border-2 mb-4"
+                    >
+                      <Ionicons
+                        name="trophy-outline"
+                        size={48}
+                        color={colors.status.infoLight}
+                      />
                     </View>
-                    <Text className="text-3xl font-black text-brand-primary text-center">Exercise Completed!</Text>
-                    <Text className="text-content-secondary text-sm text-center mt-2">All {exercise.sets.length} sets logged successfully.</Text>
+                    <AppText
+                      weight="bold"
+                      style={{ color: colors.brand.primary }}
+                      className="text-3xl font-black text-center"
+                    >
+                      {t('activeExercise.completedTitle')}
+                    </AppText>
+                    <AppText
+                      style={{ color: colors.content.secondary }}
+                      className="text-sm text-center mt-2"
+                    >
+                      {t('activeExercise.completedSubtitle', {
+                        total: exercise.sets.length,
+                      })}
+                    </AppText>
                   </View>
 
-                  <View className="w-full bg-brand-surface rounded-2xl p-5 mb-4 border border-brand-surfaceBorder">
-                    <Text className="text-content-secondary text-xs font-bold uppercase tracking-wider mb-3">Summary of Sets</Text>
+                  <View
+                    style={{
+                      backgroundColor: colors.brand.surface,
+                      borderColor: colors.brand.surfaceBorder,
+                    }}
+                    className="w-full rounded-2xl p-5 mb-4 border"
+                  >
+                    <AppText
+                      weight="bold"
+                      style={{ color: colors.content.secondary }}
+                      className="text-xs font-bold uppercase tracking-wider mb-3"
+                    >
+                      {t('activeExercise.summarySets')}
+                    </AppText>
                     {exercise.sets.map((s, idx) => (
-                      <View key={idx} className="flex-row items-center justify-between py-3 border-b border-brand-surfaceBorder/40 last:border-b-0">
+                      <View
+                        key={idx}
+                        style={{ borderBottomColor: colors.brand.surfaceBorder + '40' }}
+                        className="flex-row items-center justify-between py-3 border-b last:border-b-0"
+                      >
                         <View className="flex-row items-center">
-                          <View className="w-8 h-8 rounded-full bg-status-info/20 items-center justify-center mr-3">
-                            <Text className="text-status-infoLight text-sm font-bold">{s.setNumber}</Text>
+                          <View
+                            style={{ backgroundColor: colors.status.info + '20' }}
+                            className="w-8 h-8 rounded-full items-center justify-center mr-3"
+                          >
+                            <AppText
+                              weight="bold"
+                              style={{ color: colors.status.infoLight }}
+                              className="text-sm font-bold"
+                            >
+                              {s.setNumber}
+                            </AppText>
                           </View>
-                          <Text className="text-brand-primary text-base font-semibold">Set {s.setNumber}</Text>
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="text-base font-semibold"
+                          >
+                            {t('activeExercise.setNumber', { number: s.setNumber })}
+                          </AppText>
                         </View>
-                        <Text className="text-content-secondary text-sm font-semibold">
-                          {s.weight !== null && s.weight !== undefined && s.weight > 0 ? `${s.weight} kg` : 'BW'} × {s.reps ?? 0} reps (RPE {s.rpe ?? 8})
-                        </Text>
+                        <AppText
+                          style={{ color: colors.content.secondary }}
+                          className="text-sm font-semibold"
+                        >
+                          {s.weight !== null && s.weight !== undefined && s.weight > 0
+                            ? `${s.weight} kg`
+                            : 'BW'}{' '}
+                          × {s.reps ?? 0} reps (RPE {s.rpe ?? 8})
+                        </AppText>
                       </View>
                     ))}
                   </View>
@@ -623,16 +1207,67 @@ export default function ActiveExerciseModal({
 
                 <View className="w-full gap-4 mt-5">
                   {!isLastExercise && nextExerciseName ? (
-                    <TouchableOpacity activeOpacity={0.85} onPress={handleNextExercise} className="w-full bg-brand-primary py-5 rounded-2xl flex-row items-center justify-center shadow-lg">
-                      <Text className="text-brand-background text-lg font-bold mr-2">Next Exercise: {nextExerciseName}</Text>
-                      <Ionicons name="arrow-forward" size={20} color={Colors.brand.background} />
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={handleNextExercise}
+                      style={{ backgroundColor: colors.brand.primary }}
+                      className="w-full py-5 rounded-2xl flex-row items-center justify-center shadow-lg"
+                    >
+                      <AppText
+                        weight="bold"
+                        style={{ color: colors.brand.background }}
+                        className="text-lg font-bold mr-2"
+                      >
+                        {t('activeExercise.nextExercise', { name: nextExerciseName })}
+                      </AppText>
+                      <Ionicons
+                        name="arrow-forward"
+                        size={20}
+                        color={colors.brand.background}
+                      />
                     </TouchableOpacity>
                   ) : null}
-                  <TouchableOpacity activeOpacity={0.8} onPress={onClose} className={`w-full py-5 rounded-2xl flex-row items-center justify-center ${!isLastExercise && nextExerciseName ? 'bg-brand-surface border border-brand-surfaceBorder' : 'bg-brand-primary shadow-lg'}`}>
-                    <Text className={`text-lg font-bold ${!isLastExercise && nextExerciseName ? 'text-brand-primary' : 'text-brand-background'}`}>Back to Overview</Text>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={onClose}
+                    style={{
+                      backgroundColor:
+                        !isLastExercise && nextExerciseName
+                          ? colors.brand.surface
+                          : colors.brand.primary,
+                      borderColor: colors.brand.surfaceBorder,
+                    }}
+                    className={`w-full py-5 rounded-2xl flex-row items-center justify-center ${
+                      !isLastExercise && nextExerciseName ? 'border' : 'shadow-lg'
+                    }`}
+                  >
+                    <AppText
+                      weight="bold"
+                      style={{
+                        color:
+                          !isLastExercise && nextExerciseName
+                            ? colors.brand.primary
+                            : colors.brand.background,
+                      }}
+                      className="text-lg font-bold"
+                    >
+                      {t('activeExercise.backToOverview')}
+                    </AppText>
                   </TouchableOpacity>
-                  <TouchableOpacity activeOpacity={0.7} onPress={handleAddAnotherSet} className="w-full py-3 items-center justify-center">
-                    <Text className="text-status-infoLight text-sm font-bold uppercase tracking-wider">+ Add Another Set</Text>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleAddAnotherSet}
+                    className="w-full py-3 items-center justify-center"
+                  >
+                    <AppText
+                      weight="bold"
+                      style={{ color: colors.status.infoLight }}
+                      className="text-sm font-bold uppercase tracking-wider"
+                    >
+                      {t('activeExercise.addAnotherSet')}
+                    </AppText>
                   </TouchableOpacity>
                 </View>
               </View>

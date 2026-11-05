@@ -1,17 +1,21 @@
-import { Colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function TabsLayout() {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.brand.primary,
-        tabBarInactiveTintColor: Colors.content.tertiary,
+        tabBarActiveTintColor: colors.brand.primary,
+        tabBarInactiveTintColor: colors.content.tertiary,
         tabBarStyle: {
-          backgroundColor: Colors.brand.background,
-          borderTopColor: Colors.brand.surfaceBorder,
+          backgroundColor: colors.brand.background,
+          borderTopColor: colors.brand.surfaceBorder,
           borderTopWidth: 1,
         },
         tabBarLabelStyle: {
@@ -19,7 +23,7 @@ export default function TabsLayout() {
           fontWeight: '600',
         },
         sceneStyle: {
-          backgroundColor: Colors.brand.background,
+          backgroundColor: colors.brand.background,
         },
       }}
     >
@@ -27,7 +31,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -37,7 +41,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="exercises"
         options={{
-          title: 'Exercises',
+          title: t('tabs.exercises'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="barbell-outline" size={size} color={color} />
           ),
@@ -47,7 +51,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="routines"
         options={{
-          title: 'Routines',
+          title: t('tabs.routines'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="search-outline" size={size} color={color} />
           ),
@@ -57,7 +61,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="programs"
         options={{
-          title: 'Programs',
+          title: t('tabs.programs'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
@@ -67,7 +71,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Account',
+          title: t('tabs.account'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),

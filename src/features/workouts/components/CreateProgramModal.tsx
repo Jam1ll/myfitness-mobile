@@ -1,4 +1,5 @@
 import { workoutApi } from '@/api/workoutApi';
+import AppText from '@/components/common/AppText';
 import type {
   CreateWeeklyProgramRequest,
   DayOfWeek,
@@ -6,10 +7,11 @@ import type {
   UpdateWeeklyProgramRequest,
   WeeklyProgramResponse,
 } from '@/features/workouts/types';
-import { Colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -17,27 +19,22 @@ import {
   Pressable,
   ScrollView,
   Switch,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-const DAYS_OF_WEEK: { label: string; value: DayOfWeek }[] = [
-  { label: 'Monday', value: 'MONDAY' },
-  { label: 'Tuesday', value: 'TUESDAY' },
-  { label: 'Wednesday', value: 'WEDNESDAY' },
-  { label: 'Thursday', value: 'THURSDAY' },
-  { label: 'Friday', value: 'FRIDAY' },
-  { label: 'Saturday', value: 'SATURDAY' },
-  { label: 'Sunday', value: 'SUNDAY' },
+const DAYS_OF_WEEK: { labelKey: string; defaultLabel: string; value: DayOfWeek }[] = [
+  { labelKey: 'home.weekDays.mon', defaultLabel: 'Monday', value: 'MONDAY' },
+  { labelKey: 'home.weekDays.tue', defaultLabel: 'Tuesday', value: 'TUESDAY' },
+  { labelKey: 'home.weekDays.wed', defaultLabel: 'Wednesday', value: 'WEDNESDAY' },
+  { labelKey: 'home.weekDays.thu', defaultLabel: 'Thursday', value: 'THURSDAY' },
+  { labelKey: 'home.weekDays.fri', defaultLabel: 'Friday', value: 'FRIDAY' },
+  { labelKey: 'home.weekDays.sat', defaultLabel: 'Saturday', value: 'SATURDAY' },
+  { labelKey: 'home.weekDays.sun', defaultLabel: 'Sunday', value: 'SUNDAY' },
 ];
 
 type RoutineOption = { id: string; name: string };
-
-// ─── Props ──────────────────────────────────────────────────────────────────
 
 interface CreateProgramModalProps {
   isVisible: boolean;
@@ -46,8 +43,6 @@ interface CreateProgramModalProps {
   initialData?: WeeklyProgramResponse | null;
 }
 
-// ─── Component ──────────────────────────────────────────────────────────────
-
 export default function CreateProgramModal({
   isVisible,
   onClose,
@@ -55,6 +50,8 @@ export default function CreateProgramModal({
   initialData,
 }: CreateProgramModalProps) {
   const queryClient = useQueryClient();
+  const { colors } = useTheme();
+  const { t } = useTranslation();
 
   const [name, setName] = useState('');
   const [weeklyProgramActive, setWeeklyProgramActive] = useState(false);
@@ -68,10 +65,7 @@ export default function CreateProgramModal({
     SUNDAY: null,
   });
 
-  // The day currently showing the routine picker
   const [pickingDay, setPickingDay] = useState<DayOfWeek | null>(null);
-
-  // ── Queries ───────────────────────────────────────────────────────────────
 
   const { data: routinesPage, isLoading: loadingRoutines } = useQuery({
     queryKey: ['routines', 'all'],
@@ -85,8 +79,6 @@ export default function CreateProgramModal({
       name: r.name,
     }));
   }, [routinesPage]);
-
-  // ── Mutations ─────────────────────────────────────────────────────────────
 
   const saveProgramMutation = useMutation({
     mutationFn: async ({
@@ -109,11 +101,9 @@ export default function CreateProgramModal({
     },
     onError: (error) => {
       console.error('Error saving program:', error);
-      Alert.alert('Error', 'Could not save the program. Check the Expo console for details.');
+      Alert.alert(t('common.error'), t('programs.saveError'));
     },
   });
-
-  // ── Sync form when modal opens or initialData changes ─────────────────────
 
   useEffect(() => {
     if (!isVisible) return;
@@ -151,8 +141,6 @@ export default function CreateProgramModal({
     });
   }, [isVisible, initialData]);
 
-  // ── Handlers ────────────────────────────────────────────────────────────
-
   const assignRoutineToDay = (day: DayOfWeek, routineId: string | null) => {
     setDayAssignments((prev) => ({ ...prev, [day]: routineId }));
     setPickingDay(null);
@@ -160,7 +148,7 @@ export default function CreateProgramModal({
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a program name.');
+      Alert.alert(t('common.error'), t('programs.nameRequired'));
       return;
     }
 
@@ -172,7 +160,7 @@ export default function CreateProgramModal({
       }));
 
     if (programDays.length === 0) {
-      Alert.alert('Error', 'Please assign a routine to at least one day.');
+      Alert.alert(t('common.error'), t('programs.dayRequired'));
       return;
     }
 
@@ -196,14 +184,10 @@ export default function CreateProgramModal({
     }
   };
 
-  // ── Helpers ─────────────────────────────────────────────────────────────
-
   const getRoutineName = (routineId: string | null): string => {
-    if (!routineId) return 'Rest day';
-    return routineOptions.find((r) => r.id === routineId)?.name ?? 'Unknown routine';
+    if (!routineId) return t('programs.restDay');
+    return routineOptions.find((r) => r.id === routineId)?.name ?? t('programs.unknownRoutine');
   };
-
-  // ── Render ──────────────────────────────────────────────────────────────
 
   return (
     <Modal
@@ -213,80 +197,147 @@ export default function CreateProgramModal({
       onRequestClose={onClose}
     >
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-brand-background/80" onPress={onClose} />
+        <Pressable
+          style={{ backgroundColor: colors.brand.background + 'B3' }}
+          className="absolute inset-0"
+          onPress={onClose}
+        />
 
-        <View className="bg-brand-surface rounded-t-3xl px-6 pt-3 pb-10 max-h-[90%] min-h-[80%]">
+        <View
+          style={{ backgroundColor: colors.brand.surface }}
+          className="rounded-t-3xl px-6 pt-3 pb-10 max-h-[90%] min-h-[80%]"
+        >
           {/* Drag indicator */}
           <View className="items-center mb-4">
-            <View className="w-12 h-1.5 rounded-full bg-brand-muted" />
+            <View
+              style={{ backgroundColor: colors.brand.muted }}
+              className="w-12 h-1.5 rounded-full"
+            />
           </View>
 
-          <Text className="text-brand-primary text-2xl font-bold mb-4">
-            {initialData ? 'Edit Program' : 'Create Program'}
-          </Text>
+          <AppText
+            weight="bold"
+            style={{ color: colors.brand.primary }}
+            className="text-2xl font-bold mb-4"
+          >
+            {initialData ? t('programs.editProgram') : t('programs.createProgram')}
+          </AppText>
 
           <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
             {/* Program name */}
-            <Text className="text-content-secondary text-xs font-semibold mb-1 uppercase tracking-wider">
-              Program Name
-            </Text>
+            <AppText
+              weight="bold"
+              style={{ color: colors.content.secondary }}
+              className="text-xs font-semibold mb-1 uppercase tracking-wider"
+            >
+              {t('programs.programNameLabel')}
+            </AppText>
             <TextInput
-              placeholder="e.g. Push / Pull / Legs"
-              placeholderTextColor={Colors.content.muted}
+              placeholder={t('programs.programNamePlaceholder')}
+              placeholderTextColor={colors.content.muted}
               value={name}
               onChangeText={setName}
-              className="bg-brand-background text-brand-primary text-base px-4 py-3.5 rounded-xl border border-brand-surfaceBorder mb-6"
+              style={{
+                backgroundColor: colors.brand.background,
+                color: colors.brand.primary,
+                borderColor: colors.brand.surfaceBorder,
+              }}
+              className="text-base px-4 py-3.5 rounded-xl border mb-6"
             />
 
             {/* Active program toggle (only when editing) */}
             {initialData && (
-              <View className="flex-row items-center justify-between bg-brand-background p-4 rounded-xl border border-brand-surfaceBorder mb-6">
+              <View
+                style={{
+                  backgroundColor: colors.brand.background,
+                  borderColor: colors.brand.surfaceBorder,
+                }}
+                className="flex-row items-center justify-between p-4 rounded-xl border mb-6"
+              >
                 <View className="flex-1 mr-4">
-                  <Text className="text-brand-primary font-semibold text-base">Active Program</Text>
-                  <Text className="text-content-tertiary text-xs mt-0.5">
-                    Set this as your currently active weekly training program
-                  </Text>
+                  <AppText
+                    weight="bold"
+                    style={{ color: colors.brand.primary }}
+                    className="font-semibold text-base"
+                  >
+                    {t('programs.activeProgram')}
+                  </AppText>
+                  <AppText
+                    style={{ color: colors.content.tertiary }}
+                    className="text-xs mt-0.5"
+                  >
+                    {t('programs.activeProgramDescription')}
+                  </AppText>
                 </View>
                 <Switch
                   value={weeklyProgramActive}
                   onValueChange={setWeeklyProgramActive}
-                  trackColor={{ false: Colors.brand.surfaceBorder, true: Colors.status.info }}
-                  thumbColor={Colors.brand.primary}
+                  trackColor={{ false: colors.brand.surfaceBorder, true: colors.status.info }}
+                  thumbColor={colors.brand.primary}
                 />
               </View>
             )}
 
             {/* Day-by-day assignment */}
-            <Text className="text-brand-primary text-lg font-bold mb-3">Weekly Schedule</Text>
+            <AppText
+              weight="bold"
+              style={{ color: colors.brand.primary }}
+              className="text-lg font-bold mb-3"
+            >
+              {t('programs.weeklySchedule')}
+            </AppText>
 
             {loadingRoutines ? (
-              <ActivityIndicator color={Colors.brand.primary} size="small" className="my-6" />
+              <ActivityIndicator color={colors.brand.primary} size="small" className="my-6" />
             ) : (
-              DAYS_OF_WEEK.map(({ label, value }) => {
+              DAYS_OF_WEEK.map(({ labelKey, defaultLabel, value }) => {
                 const assignedId = dayAssignments[value];
                 const isExpanded = pickingDay === value;
+                const dayLabel = t(labelKey, { defaultValue: defaultLabel });
 
                 return (
                   <View key={value} className="mb-3">
                     <TouchableOpacity
                       activeOpacity={0.7}
                       onPress={() => setPickingDay(isExpanded ? null : value)}
-                      className="bg-brand-background rounded-xl border border-brand-surfaceBorder p-4 flex-row items-center justify-between"
+                      style={{
+                        backgroundColor: colors.brand.background,
+                        borderColor: colors.brand.surfaceBorder,
+                      }}
+                      className="rounded-xl border p-4 flex-row items-center justify-between"
                     >
                       <View className="flex-row items-center flex-1">
-                        <View className="w-8 h-8 rounded-full bg-brand-surfaceAlt items-center justify-center mr-3">
-                          <Text className="text-brand-primary text-xs font-bold">
-                            {label.substring(0, 2)}
-                          </Text>
+                        <View
+                          style={{ backgroundColor: colors.brand.surfaceAlt }}
+                          className="w-8 h-8 rounded-full items-center justify-center mr-3"
+                        >
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="text-xs font-bold"
+                          >
+                            {dayLabel.substring(0, 2)}
+                          </AppText>
                         </View>
                         <View className="flex-1">
-                          <Text className="text-brand-primary font-semibold text-base">{label}</Text>
-                          <Text
-                            className={`text-xs mt-0.5 ${assignedId ? 'text-status-infoLight' : 'text-content-muted'}`}
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="font-semibold text-base"
+                          >
+                            {dayLabel}
+                          </AppText>
+                          <AppText
+                            style={{
+                              color: assignedId
+                                ? colors.status.infoLight
+                                : colors.content.muted,
+                            }}
+                            className="text-xs mt-0.5"
                             numberOfLines={1}
                           >
                             {getRoutineName(assignedId)}
-                          </Text>
+                          </AppText>
                         </View>
                       </View>
 
@@ -297,24 +348,37 @@ export default function CreateProgramModal({
                             className="mr-2 p-1"
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                           >
-                            <Ionicons name="close-circle" size={18} color={Colors.content.muted} />
+                            <Ionicons
+                              name="close-circle"
+                              size={18}
+                              color={colors.content.muted}
+                            />
                           </TouchableOpacity>
                         )}
                         <Ionicons
                           name={isExpanded ? 'chevron-up' : 'chevron-down'}
                           size={18}
-                          color={Colors.content.tertiary}
+                          color={colors.content.tertiary}
                         />
                       </View>
                     </TouchableOpacity>
 
                     {/* Expandable routine picker */}
                     {isExpanded && (
-                      <View className="bg-brand-surfaceAlt/50 rounded-b-xl border border-t-0 border-brand-surfaceBorder px-2 py-2 -mt-1">
+                      <View
+                        style={{
+                          backgroundColor: colors.brand.surfaceAlt + '80',
+                          borderColor: colors.brand.surfaceBorder,
+                        }}
+                        className="rounded-b-xl border border-t-0 px-2 py-2 -mt-1"
+                      >
                         {routineOptions.length === 0 ? (
-                          <Text className="text-content-tertiary text-sm text-center py-4">
-                            No routines available. Create one first!
-                          </Text>
+                          <AppText
+                            style={{ color: colors.content.tertiary }}
+                            className="text-sm text-center py-4"
+                          >
+                            {t('programs.noRoutinesAvailable')}
+                          </AppText>
                         ) : (
                           routineOptions.map((routine) => {
                             const isSelected = assignedId === routine.id;
@@ -323,20 +387,31 @@ export default function CreateProgramModal({
                                 key={routine.id}
                                 activeOpacity={0.7}
                                 onPress={() => assignRoutineToDay(value, routine.id)}
-                                className={`flex-row items-center justify-between p-3 rounded-lg mb-1 ${
-                                  isSelected ? 'bg-brand-primary/10' : ''
-                                }`}
+                                style={{
+                                  backgroundColor: isSelected
+                                    ? colors.brand.primary + '1A'
+                                    : 'transparent',
+                                }}
+                                className="flex-row items-center justify-between p-3 rounded-lg mb-1"
                               >
-                                <Text
-                                  className={`text-sm font-medium ${
-                                    isSelected ? 'text-brand-primary' : 'text-content-secondary'
-                                  }`}
+                                <AppText
+                                  weight={isSelected ? 'bold' : 'regular'}
+                                  style={{
+                                    color: isSelected
+                                      ? colors.brand.primary
+                                      : colors.content.secondary,
+                                  }}
+                                  className="text-sm font-medium"
                                   numberOfLines={1}
                                 >
                                   {routine.name}
-                                </Text>
+                                </AppText>
                                 {isSelected && (
-                                  <Ionicons name="checkmark-circle" size={18} color={Colors.status.info} />
+                                  <Ionicons
+                                    name="checkmark-circle"
+                                    size={18}
+                                    color={colors.status.info}
+                                  />
                                 )}
                               </TouchableOpacity>
                             );
@@ -355,14 +430,19 @@ export default function CreateProgramModal({
             activeOpacity={0.8}
             onPress={handleSubmit}
             disabled={saveProgramMutation.isPending}
-            className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center mt-4"
+            style={{ backgroundColor: colors.brand.primary }}
+            className="rounded-xl py-4 flex-row items-center justify-center mt-4"
           >
             {saveProgramMutation.isPending ? (
-              <ActivityIndicator color={Colors.brand.background} size="small" />
+              <ActivityIndicator color={colors.brand.background} size="small" />
             ) : (
-              <Text className="text-brand-background text-base font-semibold">
-                {initialData ? 'Save Changes' : 'Create Program'}
-              </Text>
+              <AppText
+                weight="bold"
+                style={{ color: colors.brand.background }}
+                className="text-base font-semibold"
+              >
+                {initialData ? t('programs.saveChanges') : t('programs.createProgram')}
+              </AppText>
             )}
           </TouchableOpacity>
         </View>

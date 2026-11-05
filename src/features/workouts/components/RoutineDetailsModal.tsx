@@ -1,7 +1,16 @@
+import AppText from '@/components/common/AppText';
 import type { RoutineDetailResponse } from '@/features/workouts/types';
-import { Colors } from '@/theme/colors';
+import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 interface RoutineDetailsProps {
   isVisible: boolean;
@@ -12,82 +21,218 @@ interface RoutineDetailsProps {
   onEdit?: (routine: RoutineDetailResponse) => void;
 }
 
-export default function RoutineDetailsModal({ isVisible, onClose, routine, loading, onDelete, onEdit }: RoutineDetailsProps) {
+export default function RoutineDetailsModal({
+  isVisible,
+  onClose,
+  routine,
+  loading,
+  onDelete,
+  onEdit,
+}: RoutineDetailsProps) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   const exercises = routine?.enrichedRoutineExercises ?? [];
 
   return (
-    <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={isVisible}
+      onRequestClose={onClose}
+    >
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-brand-background/70" onPress={onClose} />
+        <Pressable
+          style={{ backgroundColor: colors.brand.background + 'B3' }}
+          className="absolute inset-0"
+          onPress={onClose}
+        />
 
-        <View className="bg-brand-surface rounded-t-3xl px-6 pt-3 pb-10 min-h-[60%] max-h-[90%]">
+        <View
+          style={{ backgroundColor: colors.brand.surface }}
+          className="rounded-t-3xl px-6 pt-3 pb-10 min-h-[60%] max-h-[90%]"
+        >
           <View className="items-center mb-6">
-            <View className="w-12 h-1.5 rounded-full bg-brand-muted" />
+            <View
+              style={{ backgroundColor: colors.brand.muted }}
+              className="w-12 h-1.5 rounded-full"
+            />
           </View>
 
           {loading || !routine ? (
             <View className="items-center justify-center py-10">
-              <ActivityIndicator color={Colors.brand.primary} size="large" />
-              <Text className="text-content-secondary mt-4">Loading routine...</Text>
+              <ActivityIndicator color={colors.brand.primary} size="large" />
+              <AppText
+                style={{ color: colors.content.secondary }}
+                className="mt-4"
+              >
+                {t('routines.loadingRoutine')}
+              </AppText>
             </View>
           ) : (
             <View className="flex-1">
               <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-content-secondary text-sm">
-                  Created by {routine.createdBy || 'Unknown'}
-                </Text>
-                <View className="flex-row items-center bg-brand-surfaceAlt/50 rounded-full px-3 py-1">
+                <AppText
+                  style={{ color: colors.content.secondary }}
+                  className="text-sm"
+                >
+                  {t('routines.createdBy', { name: routine.createdBy || 'Unknown' })}
+                </AppText>
+                <View
+                  style={{ backgroundColor: colors.brand.surfaceAlt + '80' }}
+                  className="flex-row items-center rounded-full px-3 py-1"
+                >
                   <Ionicons
-                    name={routine.routinePrivate ? "lock-closed" : "globe-outline"}
+                    name={routine.routinePrivate ? 'lock-closed' : 'globe-outline'}
                     size={14}
-                    color={routine.routinePrivate ? Colors.status.dangerLight : Colors.status.infoLight}
+                    color={
+                      routine.routinePrivate
+                        ? colors.status.dangerLight
+                        : colors.status.infoLight
+                    }
                   />
-                  <Text className="text-content-secondary text-xs ml-1.5">
-                    {routine.routinePrivate ? 'Private' : 'Public'}
-                  </Text>
+                  <AppText
+                    style={{ color: colors.content.secondary }}
+                    className="text-xs ml-1.5"
+                  >
+                    {routine.routinePrivate ? t('routines.private') : t('routines.public')}
+                  </AppText>
                 </View>
               </View>
 
-              <Text className="text-brand-primary text-3xl font-bold mb-6">{routine.name}</Text>
-              <Text className="text-brand-primary text-lg font-semibold mb-4">
-                Exercises ({exercises.length})
-              </Text>
+              <AppText
+                weight="bold"
+                style={{ color: colors.brand.primary }}
+                className="text-3xl font-bold mb-6"
+              >
+                {routine.name}
+              </AppText>
+              <AppText
+                weight="bold"
+                style={{ color: colors.brand.primary }}
+                className="text-lg font-semibold mb-4"
+              >
+                {t('routines.exercisesWithCount', { count: exercises.length })}
+              </AppText>
 
               <ScrollView showsVerticalScrollIndicator={false} className="flex-1 mb-4">
                 {exercises.length === 0 ? (
-                  <Text className="text-content-tertiary italic mt-2">No exercises added to this routine yet.</Text>
+                  <AppText
+                    style={{ color: colors.content.tertiary }}
+                    className="italic mt-2"
+                  >
+                    {t('routines.noExercisesDetail')}
+                  </AppText>
                 ) : (
                   exercises.map((ex, index) => (
-                    <View key={`${ex.exerciseId}-${index}`} className="bg-brand-surfaceAlt/50 rounded-xl p-4 mb-3 border border-brand-surfaceBorder">
+                    <View
+                      key={`${ex.exerciseId}-${index}`}
+                      style={{
+                        backgroundColor: colors.brand.surfaceAlt + '80',
+                        borderColor: colors.brand.surfaceBorder,
+                      }}
+                      className="rounded-xl p-4 mb-3 border"
+                    >
                       <View className="flex-row items-center justify-between mb-1">
-                        <Text className="text-brand-primary text-base font-semibold">{ex.name || 'Exercise'}</Text>
+                        <AppText
+                          weight="bold"
+                          style={{ color: colors.brand.primary }}
+                          className="text-base font-semibold"
+                        >
+                          {ex.name || 'Exercise'}
+                        </AppText>
                         {ex.muscleGroup ? (
-                          <Text className="text-xs text-content-tertiary bg-brand-surfaceAlt px-2 py-1 rounded">{ex.muscleGroup}</Text>
+                          <View
+                            style={{ backgroundColor: colors.brand.surfaceAlt }}
+                            className="px-2 py-1 rounded"
+                          >
+                            <AppText
+                              style={{ color: colors.content.tertiary }}
+                              className="text-xs"
+                            >
+                              {ex.muscleGroup}
+                            </AppText>
+                          </View>
                         ) : null}
                       </View>
 
                       {ex.description ? (
-                        <Text className="text-content-secondary text-xs mb-2" numberOfLines={2}>{ex.description}</Text>
+                        <AppText
+                          style={{ color: colors.content.secondary }}
+                          className="text-xs mb-2"
+                          numberOfLines={2}
+                        >
+                          {ex.description}
+                        </AppText>
                       ) : null}
 
-                      <View className="flex-row gap-4 mt-2 pt-2 border-t border-brand-borderMuted/50">
-                        <Text className="text-content-secondary text-xs">Sets: <Text className="text-brand-primary font-bold">{ex.targetSets ?? 0}</Text></Text>
-                        <Text className="text-content-secondary text-xs">Reps: <Text className="text-brand-primary font-bold">{ex.targetReps ?? 0}</Text></Text>
-                        <Text className="text-content-secondary text-xs">Rest: <Text className="text-brand-primary font-bold">{ex.restTimeSeconds ?? 0}s</Text></Text>
+                      <View
+                        style={{ borderTopColor: colors.brand.borderMuted + '80' }}
+                        className="flex-row gap-4 mt-2 pt-2 border-t"
+                      >
+                        <AppText
+                          style={{ color: colors.content.secondary }}
+                          className="text-xs"
+                        >
+                          {t('routines.sets')}:{' '}
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="font-bold"
+                          >
+                            {ex.targetSets ?? 0}
+                          </AppText>
+                        </AppText>
+                        <AppText
+                          style={{ color: colors.content.secondary }}
+                          className="text-xs"
+                        >
+                          {t('routines.reps')}:{' '}
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="font-bold"
+                          >
+                            {ex.targetReps ?? 0}
+                          </AppText>
+                        </AppText>
+                        <AppText
+                          style={{ color: colors.content.secondary }}
+                          className="text-xs"
+                        >
+                          {t('routines.restSeconds')}:{' '}
+                          <AppText
+                            weight="bold"
+                            style={{ color: colors.brand.primary }}
+                            className="font-bold"
+                          >
+                            {ex.restTimeSeconds ?? 0}s
+                          </AppText>
+                        </AppText>
                       </View>
                     </View>
                   ))
                 )}
               </ScrollView>
 
-              {/* Botones */}
+              {/* Action buttons */}
               <View className="flex-row gap-3 mt-2">
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={onClose}
-                  className="flex-1 bg-brand-surfaceAlt border border-brand-borderMuted rounded-xl py-4 flex-row items-center justify-center"
+                  style={{
+                    backgroundColor: colors.brand.surfaceAlt,
+                    borderColor: colors.brand.borderMuted,
+                  }}
+                  className="flex-1 border rounded-xl py-4 flex-row items-center justify-center"
                 >
-                  <Text className="text-brand-primary text-base font-semibold">Close</Text>
+                  <AppText
+                    weight="bold"
+                    style={{ color: colors.brand.primary }}
+                    className="text-base font-semibold"
+                  >
+                    {t('common.close')}
+                  </AppText>
                 </TouchableOpacity>
 
                 {routine.routineOwner && (
@@ -96,24 +241,31 @@ export default function RoutineDetailsModal({ isVisible, onClose, routine, loadi
                       <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={() => onEdit(routine)}
-                        className="bg-status-info/10 border border-status-info/30 rounded-xl px-4 py-4 flex-row items-center justify-center"
+                        style={{
+                          backgroundColor: colors.status.info + '1A',
+                          borderColor: colors.status.info + '4D',
+                        }}
+                        className="border rounded-xl px-4 py-4 flex-row items-center justify-center"
                       >
-                        <Ionicons name="pencil" size={20} color={Colors.status.info} />
+                        <Ionicons name="pencil" size={20} color={colors.status.info} />
                       </TouchableOpacity>
                     )}
                     {onDelete && (
                       <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={() => onDelete(routine.id)}
-                        className="bg-status-danger/10 border border-status-danger/30 rounded-xl px-4 py-4 flex-row items-center justify-center"
+                        style={{
+                          backgroundColor: colors.status.danger + '1A',
+                          borderColor: colors.status.danger + '4D',
+                        }}
+                        className="border rounded-xl px-4 py-4 flex-row items-center justify-center"
                       >
-                        <Ionicons name="trash-outline" size={20} color={Colors.status.danger} />
+                        <Ionicons name="trash-outline" size={20} color={colors.status.danger} />
                       </TouchableOpacity>
                     )}
                   </>
                 )}
               </View>
-
             </View>
           )}
         </View>

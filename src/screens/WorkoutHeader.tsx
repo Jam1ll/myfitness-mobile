@@ -1,45 +1,107 @@
-import { Colors } from '@/theme/colors';
+import AppText from '@/components/common/AppText';
+import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { TouchableOpacity, View } from 'react-native';
 
 interface Props {
-    workoutName: string;
-    elapsedTime: string;
-    exerciseCount: number;
-    onDiscard: () => void;
-    onAddExercise: () => void;
+  workoutName: string;
+  elapsedTime: string;
+  exerciseCount: number;
+  onDiscard: () => void;
+  onAddExercise: () => void;
 }
 
-export default function WorkoutHeader({ workoutName, elapsedTime, exerciseCount, onDiscard, onAddExercise }: Props) {
-    return (
-        <View className="px-5 pt-4 pb-5 border-b border-brand-surfaceBorder">
-            <View className="flex-row items-center justify-between mb-4">
-                {/* Botón Discard Agrandado */}
-                <TouchableOpacity activeOpacity={0.7} onPress={onDiscard} className="flex-row items-center py-2.5 px-4 rounded-xl bg-status-danger/10 border border-status-danger/20">
-                    <Ionicons name="trash-outline" size={18} color={Colors.status.danger} />
-                    <Text className="text-status-danger text-sm font-bold ml-2">Discard</Text>
-                </TouchableOpacity>
+export default function WorkoutHeader({
+  workoutName,
+  elapsedTime,
+  exerciseCount,
+  onDiscard,
+  onAddExercise,
+}: Props) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
 
-                {/* Cronómetro Global Agrandado */}
-                <View className="flex-row items-center bg-brand-surfaceAlt px-4 py-2 rounded-full border border-brand-surfaceBorder">
-                    <Ionicons name="time-outline" size={18} color={Colors.status.infoLight} />
-                    <Text className="text-brand-primary text-sm font-bold ml-2 font-mono">{elapsedTime}</Text>
-                </View>
+  return (
+    <View
+      style={{ borderBottomColor: colors.brand.surfaceBorder }}
+      className="px-5 pt-4 pb-5 border-b"
+    >
+      <View className="flex-row items-center justify-between mb-4">
+        {/* Discard Button */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onDiscard}
+          style={{
+            backgroundColor: colors.status.danger + '15',
+            borderColor: colors.status.danger + '30',
+          }}
+          className="flex-row items-center py-2.5 px-4 rounded-xl border"
+        >
+          <Ionicons name="trash-outline" size={18} color={colors.status.danger} />
+          <AppText
+            weight="bold"
+            style={{ color: colors.status.danger }}
+            className="text-sm font-bold ml-2"
+          >
+            {t('activeWorkout.discard')}
+          </AppText>
+        </TouchableOpacity>
 
-                {/* Botón Add Agrandado */}
-                <TouchableOpacity activeOpacity={0.7} onPress={onAddExercise} className="flex-row items-center py-2.5 px-4 rounded-xl bg-brand-surfaceAlt border border-brand-surfaceBorder">
-                    <Ionicons name="add" size={20} color={Colors.brand.primary} />
-                    <Text className="text-brand-primary text-sm font-bold ml-1">Add</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Títulos más legibles */}
-            <Text className="text-brand-primary text-3xl font-black" numberOfLines={1}>
-                {workoutName || 'Workout Session'}
-            </Text>
-            <Text className="text-content-secondary text-sm mt-1.5 font-medium">
-                {exerciseCount} exercises • Tap an exercise to enter Focus Mode
-            </Text>
+        {/* Global Stopwatch */}
+        <View
+          style={{
+            backgroundColor: colors.brand.surfaceAlt,
+            borderColor: colors.brand.surfaceBorder,
+          }}
+          className="flex-row items-center px-4 py-2 rounded-full border"
+        >
+          <Ionicons name="time-outline" size={18} color={colors.status.infoLight} />
+          <AppText
+            weight="bold"
+            style={{ color: colors.brand.primary }}
+            className="text-sm font-bold ml-2 font-mono"
+          >
+            {elapsedTime}
+          </AppText>
         </View>
-    );
+
+        {/* Add Exercise Button */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onAddExercise}
+          style={{
+            backgroundColor: colors.brand.surfaceAlt,
+            borderColor: colors.brand.surfaceBorder,
+          }}
+          className="flex-row items-center py-2.5 px-4 rounded-xl border"
+        >
+          <Ionicons name="add" size={20} color={colors.brand.primary} />
+          <AppText
+            weight="bold"
+            style={{ color: colors.brand.primary }}
+            className="text-sm font-bold ml-1"
+          >
+            {t('activeWorkout.add')}
+          </AppText>
+        </TouchableOpacity>
+      </View>
+
+      {/* Routine Title & Subtitle */}
+      <AppText
+        weight="bold"
+        style={{ color: colors.brand.primary }}
+        className="text-3xl font-black"
+        numberOfLines={1}
+      >
+        {workoutName || t('activeWorkout.defaultSessionName')}
+      </AppText>
+      <AppText
+        style={{ color: colors.content.secondary }}
+        className="text-sm mt-1.5 font-medium"
+      >
+        {t('activeWorkout.exercisesCountFocusMode', { count: exerciseCount })}
+      </AppText>
+    </View>
+  );
 }
