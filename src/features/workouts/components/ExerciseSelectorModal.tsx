@@ -1,7 +1,7 @@
 import { axiosClient } from '@/api/axiosClient';
 import { Colors } from '@/theme/colors';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 
 type ExerciseItem = {
@@ -22,12 +22,21 @@ export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, i
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
 
+  // Usamos una referencia para saber si ya inicializamos los IDs en esta apertura del modal
+  const hasInitialized = useRef(false);
+
   useEffect(() => {
     if (isVisible) {
-      setSelectedIds(initialSelectedIds);
+      if (!hasInitialized.current) {
+        setSelectedIds(initialSelectedIds);
+        hasInitialized.current = true;
+      }
       fetchExercises();
+    } else {
+      // Reseteamos el flag cuando se cierra para la próxima vez que se abra
+      hasInitialized.current = false;
     }
-  }, [isVisible, initialSelectedIds]);
+  }, [isVisible]); // Quitamos initialSelectedIds de las dependencias para evitar el bucle
 
   const fetchExercises = async () => {
     setLoading(true);
@@ -49,7 +58,7 @@ export default function ExerciseSelectorModal({ isVisible, onClose, onConfirm, i
     <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
       <View className="flex-1 justify-end">
         <Pressable className="absolute inset-0 bg-brand-background/80" onPress={onClose} />
-        
+
         <View className="bg-brand-surface rounded-t-3xl px-6 pt-3 pb-10 min-h-[70%] max-h-[90%]">
           <View className="items-center mb-6">
             <View className="w-12 h-1.5 rounded-full bg-brand-muted" />

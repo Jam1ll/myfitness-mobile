@@ -1,11 +1,12 @@
 import { workoutApi } from '@/api/workoutApi';
+import { useWorkoutStore } from '@/store/useWorkoutStore';
 import type { DayOfWeek, RoutineSummary } from '@/features/workouts/types';
 import { Colors } from '@/theme/colors';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -51,6 +52,10 @@ function todayIndex(): number {
 export default function HomeScreen() {
   const router = useRouter();
   const [userName, setUserName] = useState('');
+
+  // ── Workout Store ─────────────────────────────────────────────────────────
+  const startSession = useWorkoutStore((s) => s.startSession);
+  const activeSession = useWorkoutStore((s) => s.activeSession);
 
   // ── User Data (Local auth info) ───────────────────────────────────────────
 
@@ -170,6 +175,81 @@ export default function HomeScreen() {
   const firstRoutine = routines[0] ?? null;
   const remainingRoutines = routines.slice(1);
 
+  // ── Workout Navigation Handlers ───────────────────────────────────────────
+
+  const handleStartTodayWorkout = useCallback(async () => {
+    if (activeSession) {
+      router.push('/active-workout');
+      return;
+    }
+
+    if (!todayRoutineId) return;
+
+    let exercises: Array<{ exerciseId: string; name: string }> = [];
+    if (todayRoutineDetailData?.enrichedRoutineExercises?.length) {
+      exercises = todayRoutineDetailData.enrichedRoutineExercises.map((ex) => ({
+        exerciseId: ex.exerciseId,
+        name: ex.name,
+      }));
+    } else {
+      try {
+        const full = await workoutApi.getRoutineById(todayRoutineId);
+        exercises = (full.enrichedRoutineExercises ?? []).map((ex) => ({
+          exerciseId: ex.exerciseId,
+          name: ex.name,
+        }));
+      } catch (e) {
+        console.error('Error fetching today routine exercises:', e);
+      }
+    }
+
+    const routineName = todayRoutineDetail?.name || todayProgramDay?.routineName || 'Today Workout';
+    startSession(todayRoutineId, routineName, exercises);
+    router.push('/active-workout');
+  }, [
+    activeSession,
+    todayRoutineId,
+    todayRoutineDetailData,
+    todayRoutineDetail?.name,
+    todayProgramDay?.routineName,
+    startSession,
+    router,
+  ]);
+
+  const handleStartLastCreated = useCallback(
+    async (routine: RoutineSummary) => {
+      if (activeSession) {
+        router.push('/active-workout');
+        return;
+      }
+
+      try {
+        const full = await workoutApi.getRoutineById(routine.id);
+        const exercises = (full.enrichedRoutineExercises ?? []).map((ex) => ({
+          exerciseId: ex.exerciseId,
+          name: ex.name,
+        }));
+        startSession(routine.id, routine.name, exercises);
+        router.push('/active-workout');
+      } catch (e) {
+        console.error('Error fetching routine exercises:', e);
+        startSession(routine.id, routine.name, []);
+        router.push('/active-workout');
+      }
+    },
+    [activeSession, startSession, router],
+  );
+
+  const handleStartFreestyle = useCallback(() => {
+    if (activeSession) {
+      router.push('/active-workout');
+      return;
+    }
+
+    startSession(null, 'Freestyle Workout', []);
+    router.push('/active-workout');
+  }, [activeSession, startSession, router]);
+
   // ── Render helpers ────────────────────────────────────────────────────────
 
   /** Weekly progress strip */
@@ -233,6 +313,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           activeOpacity={0.8}
+          onPress={handleStartTodayWorkout}
           className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center"
         >
           <Ionicons name="play" size={16} color={Colors.brand.background} />
@@ -257,6 +338,7 @@ export default function HomeScreen() {
 
       <TouchableOpacity
         activeOpacity={0.8}
+        onPress={handleStartFreestyle}
         className="bg-brand-surfaceAlt rounded-xl py-4 px-8 flex-row items-center justify-center border border-brand-surfaceBorder"
       >
         <Ionicons name="barbell-outline" size={16} color={Colors.brand.primary} />
@@ -294,6 +376,7 @@ export default function HomeScreen() {
       </Text>
       <TouchableOpacity
         activeOpacity={0.8}
+        onPress={() => handleStartLastCreated(routine)}
         className="bg-brand-primary rounded-xl py-4 flex-row items-center justify-center"
       >
         <Ionicons name="play" size={16} color={Colors.brand.background} />
@@ -379,6 +462,33 @@ export default function HomeScreen() {
               Ready to train
             </Text>
           </View>
+
+          {/* ── Active Workout Resume Banner ────────────────────────────── */}
+          {activeSession && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push('/active-workout')}
+              className="bg-status-info/15 border border-status-info/40 rounded-2xl p-4 mb-6 flex-row items-center justify-between"
+            >
+              <View className="flex-row items-center flex-1 mr-3">
+                <View className="w-10 h-10 rounded-full bg-status-info/20 items-center justify-center mr-3">
+                  <Ionicons name="pulse" size={20} color={Colors.status.infoLight} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-status-infoLight text-xs font-bold uppercase tracking-wider">
+                    Entrenamiento en curso
+                  </Text>
+                  <Text className="text-brand-primary text-base font-bold" numberOfLines={1}>
+                    {activeSession.name}
+                  </Text>
+                </View>
+              </View>
+              <View className="bg-status-info py-2 px-3.5 rounded-xl flex-row items-center">
+                <Text className="text-white text-xs font-bold mr-1">Reanudar</Text>
+                <Ionicons name="arrow-forward" size={12} color="#ffffff" />
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* ── Weekly Progress Strip ──────────────────────────────────── */}
           {renderWeekStrip()}

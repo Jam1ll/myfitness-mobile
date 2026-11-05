@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
@@ -44,9 +45,43 @@ axiosClient.interceptors.request.use(
 
     console.log(`[Axios] Petición a ${config.url} | Token:`, memoryToken ? `${memoryToken.substring(0, 15)}...` : 'NULO');
 
-    if (memoryToken && config.headers) {
+    if (!config.headers) {
+      config.headers = {} as any;
+    }
+
+    if (memoryToken) {
       config.headers.Authorization = `Bearer ${memoryToken}`;
     }
+
+    if (config.method?.toUpperCase() === 'POST') {
+      const existingHeaders = config.headers;
+      const hasIdempotencyKey =
+        (typeof existingHeaders.has === 'function' &&
+          (existingHeaders.has('Idempotency-Key') || existingHeaders.has('idempotency-key'))) ||
+        (typeof existingHeaders.get === 'function' &&
+          Boolean(existingHeaders.get('Idempotency-Key') || existingHeaders.get('idempotency-key'))) ||
+        Object.keys(existingHeaders).some(
+          (key) => key.toLowerCase() === 'idempotency-key'
+        );
+
+      if (!hasIdempotencyKey) {
+        const idempotencyKey = Crypto.randomUUID();
+        if (typeof existingHeaders.set === 'function') {
+          existingHeaders.set('Idempotency-Key', idempotencyKey);
+        } else {
+          existingHeaders['Idempotency-Key'] = idempotencyKey;
+        }
+      }
+    }
+
+    if (__DEV__) {
+      console.log(`-------------------------------------------`);
+      console.log(`[Axios Outgoing] ${config.method} -> ${config.url}`);
+      console.log(`[Headers]`, JSON.stringify(config.headers, null, 2));
+      console.log(`[Payload Data]`, JSON.stringify(config.data, null, 2));
+      console.log(`-------------------------------------------`);
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

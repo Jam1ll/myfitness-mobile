@@ -1,7 +1,7 @@
-import { ExerciseResponse } from './ExerciseDetailsModal';
 import { Colors } from '@/theme/colors';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ExerciseResponse } from './ExerciseDetailsModal';
 
 const MUSCLE_GROUPS = ['CHEST', 'BACK', 'ARMS', 'LEGS', 'CORE', 'SHOULDERS'] as const;
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
@@ -25,7 +25,7 @@ export default function CreateExerciseModal({ isVisible, onClose, onSave, isSavi
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>('CHEST');
-  const [exercisePrivate, setExercisePrivate] = useState(true);
+  const [exercisePrivate, setExercisePrivate] = useState(false); // 👈 Por defecto false (público) o true según tu preferencia
 
   useEffect(() => {
     if (isVisible) {
@@ -33,12 +33,13 @@ export default function CreateExerciseModal({ isVisible, onClose, onSave, isSavi
         setName(initialData.name);
         setDescription(initialData.description);
         setMuscleGroup(initialData.muscleGroup as MuscleGroup);
-        setExercisePrivate(initialData.exercisePrivate);
+        // 🔒 Forzamos un booleano seguro por si initialData.exercisePrivate viniera nulo de BD
+        setExercisePrivate(Boolean(initialData.exercisePrivate));
       } else {
         setName('');
         setDescription('');
         setMuscleGroup('CHEST');
-        setExercisePrivate(true);
+        setExercisePrivate(false); // 👈 Aseguramos false al crear limpio
       }
     }
   }, [isVisible, initialData]);
@@ -52,12 +53,12 @@ export default function CreateExerciseModal({ isVisible, onClose, onSave, isSavi
       Alert.alert('Validation Error', 'Description must have at least 10 characters.');
       return;
     }
-    
+
     onSave({
       name: name.trim(),
       description: description.trim(),
       muscleGroup,
-      exercisePrivate
+      exercisePrivate: Boolean(exercisePrivate),
     }, initialData?.id);
   };
 

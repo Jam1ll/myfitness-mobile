@@ -18,7 +18,7 @@ export default function CreateRoutineModal({ isVisible, onClose, onSave, isSavin
   const [name, setName] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [routineExercises, setRoutineExercises] = useState<RoutineExerciseItemDto[]>([]);
-  
+
   // Catálogo detallado local para mostrar nombres de los ejercicios seleccionados
   const [exerciseDetailsMap, setExerciseDetailsMap] = useState<Record<string, { name: string; muscleGroup: string }>>({});
   const [isSelectorVisible, setIsSelectorVisible] = useState(false);
@@ -28,7 +28,7 @@ export default function CreateRoutineModal({ isVisible, onClose, onSave, isSavin
       if (initialData) {
         setName(initialData.name || '');
         setIsPrivate(initialData.routinePrivate ?? false);
-        
+
         // Mapear los ejercicios estructurados existentes en caso de edición
         if (initialData.enrichedRoutineExercises) {
           const items: RoutineExerciseItemDto[] = initialData.enrichedRoutineExercises.map((ex, idx) => ({
@@ -113,7 +113,7 @@ export default function CreateRoutineModal({ isVisible, onClose, onSave, isSavin
         ...item,
         orderIndex: index, // Asegurar orden secuencial
       })),
-      routinePrivate: isPrivate,
+      routinePrivate: isPrivate ?? false,
     };
 
     onSave(payload, initialData?.id);

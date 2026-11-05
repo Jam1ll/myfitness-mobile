@@ -1,6 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Slot } from 'expo-router';
 import { useState } from 'react';
+import { LogBox } from 'react-native';
+import 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+LogBox.ignoreLogs([
+  'createAnimatedPropAdapter',
+]);
 
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -16,8 +23,10 @@ export default function RootLayout() {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Slot />
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <Slot />
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
