@@ -39,14 +39,12 @@ type RoutineOption = { id: string; name: string };
 interface CreateProgramModalProps {
   isVisible: boolean;
   onClose: () => void;
-  onSaved: () => void;
   initialData?: WeeklyProgramResponse | null;
 }
 
 export default function CreateProgramModal({
   isVisible,
   onClose,
-  onSaved,
   initialData,
 }: CreateProgramModalProps) {
   const queryClient = useQueryClient();
@@ -68,9 +66,10 @@ export default function CreateProgramModal({
   const [pickingDay, setPickingDay] = useState<DayOfWeek | null>(null);
 
   const { data: routinesPage, isLoading: loadingRoutines } = useQuery({
-    queryKey: ['routines', 'all'],
+    queryKey: ['workouts', 'routines', { page: 0, mineOnly: false, search: '' }],
     queryFn: () => workoutApi.getRoutines({ page: 0, size: 100, mineOnly: false, search: '' }),
     enabled: isVisible,
+    staleTime: 60_000,
   });
 
   const routineOptions = useMemo<RoutineOption[]>(() => {
@@ -94,9 +93,7 @@ export default function CreateProgramModal({
       return workoutApi.createProgram(payload as CreateWeeklyProgramRequest);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['programs'] });
-      queryClient.invalidateQueries({ queryKey: ['programs', 'active'] });
-      onSaved();
+      queryClient.invalidateQueries({ queryKey: ['workouts', 'programs'] });
       onClose();
     },
     onError: (error) => {

@@ -1,10 +1,10 @@
-import { axiosClient } from '../../api/axiosClient';
 import AppText from '@/components/common/AppText';
 import CreateProgramModal from '@/features/workouts/components/CreateProgramModal';
 import type { DayOfWeek, WeeklyProgramResponse } from '@/features/workouts/types';
 import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { workoutApi } from '@/api/workoutApi';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -42,30 +43,28 @@ const DAY_KEY_MAP: Record<DayOfWeek, string> = {
 export default function ProgramsScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
-
-  const [programs, setPrograms] = useState<WeeklyProgramResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [programToEdit, setProgramToEdit] = useState<WeeklyProgramResponse | null>(null);
 
-  // ── Fetch programs ──────────────────────────────────────────────────────
+  // ── Query: programs list ──────────────────────────────────────────────────
+  const { data: programs = [], isLoading: loading } = useQuery({
+    queryKey: ['workouts', 'programs'],
+    queryFn: workoutApi.getPrograms,
+    staleTime: 30_000,
+  });
 
-  const fetchPrograms = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await axiosClient.get('/workouts/programs');
-      setPrograms(response.data.content ?? response.data ?? []);
-    } catch {
-      Alert.alert(t('common.error'), t('programs.loadError'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    fetchPrograms();
-  }, [fetchPrograms]);
+  // ── Mutation: delete program ──────────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => workoutApi.deleteProgram(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workouts', 'programs'] });
+    },
+    onError: () => {
+      Alert.alert(t('common.error'), t('programs.deleteError'));
+    },
+  });
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -85,13 +84,8 @@ export default function ProgramsScreen() {
       {
         text: t('common.delete'),
         style: 'destructive',
-        onPress: async () => {
-          try {
-            await axiosClient.delete(`/workouts/programs/${id}`);
-            await fetchPrograms();
-          } catch {
-            Alert.alert(t('common.error'), t('programs.deleteError'));
-          }
+        onPress: () => {
+          deleteMutation.mutate(id);
         },
       },
     ]);
@@ -231,6 +225,7 @@ export default function ProgramsScreen() {
                             <TouchableOpacity
                               activeOpacity={0.7}
                               onPress={() => handleDeleteProgram(program.id)}
+                              disabled={deleteMutation.isPending}
                               style={{ backgroundColor: colors.status.danger + '15' }}
                               className="w-9 h-9 rounded-full items-center justify-center"
                             >
@@ -272,7 +267,6 @@ export default function ProgramsScreen() {
           setIsCreateModalVisible(false);
           setProgramToEdit(null);
         }}
-        onSaved={fetchPrograms}
         initialData={programToEdit}
       />
     </SafeAreaView>

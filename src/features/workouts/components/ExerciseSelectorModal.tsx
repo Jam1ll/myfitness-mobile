@@ -1,12 +1,12 @@
-import { axiosClient } from '@/api/axiosClient';
+import { catalogApi } from '@/api/catalogApi';
 import AppText from '@/components/common/AppText';
 import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -36,11 +36,17 @@ export default function ExerciseSelectorModal({
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  const [exercises, setExercises] = useState<ExerciseItem[]>([]);
-  const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
-
   const hasInitialized = useRef(false);
+
+  // ── Query: exercise catalog (gated by modal visibility) ───────────────────
+  const { data: exercisesPage, isLoading: loading } = useQuery({
+    queryKey: ['exercises', { page: 0, mineOnly: false, search: '', size: 50 }],
+    queryFn: () => catalogApi.getExercises({ page: 0, size: 50, mineOnly: false, search: '' }),
+    enabled: isVisible,
+    staleTime: 60_000,
+  });
+  const exercises: ExerciseItem[] = (exercisesPage?.content ?? []) as ExerciseItem[];
 
   useEffect(() => {
     if (isVisible) {
@@ -48,23 +54,10 @@ export default function ExerciseSelectorModal({
         setSelectedIds(initialSelectedIds);
         hasInitialized.current = true;
       }
-      fetchExercises();
     } else {
       hasInitialized.current = false;
     }
   }, [isVisible]);
-
-  const fetchExercises = async () => {
-    setLoading(true);
-    try {
-      const response = await axiosClient.get('/exercises?page=0&size=50');
-      setExercises(response.data.content || []);
-    } catch {
-      Alert.alert(t('common.error'), t('modals.loadCatalogError'));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const toggleExercise = (id: string) => {
     setSelectedIds((prev) =>

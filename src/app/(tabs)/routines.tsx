@@ -1,11 +1,11 @@
-import { axiosClient } from '../../api/axiosClient';
 import AppText from '@/components/common/AppText';
 import CreateRoutineModal from '@/features/workouts/components/CreateRoutineModal';
 import RoutineDetailsModal from '@/features/workouts/components/RoutineDetailsModal';
 import type { CreateRoutinePayload, RoutineDetailResponse } from '@/features/workouts/types';
 import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -16,16 +16,15 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { workoutApi } from '@/api/workoutApi';
 
 export default function RoutinesScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
-  const [routines, setRoutines] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [activeTab, setActiveTab] = useState<'MINE' | 'CATALOG'>('CATALOG');
 
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
@@ -33,39 +32,54 @@ export default function RoutinesScreen() {
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [routineToEdit, setRoutineToEdit] = useState<RoutineDetailResponse | null>(null);
 
-  const fetchRoutines = useCallback(
-    async (page: number, tab: 'MINE' | 'CATALOG', search: string) => {
-      setLoading(true);
-      try {
-        const isMine = tab === 'MINE';
-        const response = await axiosClient.get(
-          `/workouts/routines?page=${page}&size=20&mineOnly=${isMine}&search=${search}`,
-        );
-        setRoutines(response.data.content ?? []);
-        setTotalPages(response.data.totalPages ?? 1);
-        setCurrentPage(page);
-      } catch {
-        Alert.alert(t('common.error'), t('routines.loadError'));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [t],
-  );
+  // ── Query: routines list ──────────────────────────────────────────────────
+  const mineOnly = activeTab === 'MINE';
+  const { data: routinesPage, isLoading: loading } = useQuery({
+    queryKey: ['workouts', 'routines', { page: currentPage, mineOnly, search: searchQuery }],
+    queryFn: () =>
+      workoutApi.getRoutines({ page: currentPage, size: 20, mineOnly, search: searchQuery }),
+    staleTime: 30_000,
+  });
+  const routines = routinesPage?.content ?? [];
+  const totalPages = routinesPage?.totalPages ?? 1;
 
-  useEffect(() => {
-    fetchRoutines(0, activeTab, searchQuery);
-  }, [activeTab]);
+  // ── Mutation: save (create/update) routine ────────────────────────────────
+  const saveMutation = useMutation({
+    mutationFn: ({ payload, id }: { payload: CreateRoutinePayload; id?: string }) =>
+      id ? workoutApi.updateRoutine(id, payload) : workoutApi.createRoutine(payload),
+    onSuccess: () => {
+      setIsModalVisible(false);
+      setRoutineToEdit(null);
+      queryClient.invalidateQueries({ queryKey: ['workouts', 'routines'] });
+      queryClient.invalidateQueries({ queryKey: ['routines'] }); // home screen cache
+    },
+    onError: () => {
+      Alert.alert(t('common.error'), t('routines.saveError'));
+    },
+  });
+
+  // ── Mutation: delete routine ──────────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => workoutApi.deleteRoutine(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workouts', 'routines'] });
+      queryClient.invalidateQueries({ queryKey: ['routines'] });
+    },
+    onError: () => {
+      Alert.alert(t('common.error'), t('routines.deleteError'));
+    },
+  });
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleOpenDetails = async (id: string) => {
     setIsDetailsModalVisible(true);
     setLoadingDetails(true);
     try {
-      const response = await axiosClient.get(`/workouts/routines/${id}`);
-      setSelectedRoutine(response.data);
+      const data = await workoutApi.getRoutineById(id);
+      setSelectedRoutine(data);
     } catch {
       Alert.alert(t('common.error'), t('routines.loadDetailError'));
       setIsDetailsModalVisible(false);
@@ -74,38 +88,19 @@ export default function RoutinesScreen() {
     }
   };
 
-  const handleSaveRoutine = async (payload: CreateRoutinePayload, id?: string) => {
-    setIsSaving(true);
-    try {
-      if (id) {
-        await axiosClient.put(`/workouts/routines/${id}`, payload);
-      } else {
-        await axiosClient.post('/workouts/routines', payload);
-      }
-      setIsModalVisible(false);
-      setRoutineToEdit(null);
-      await fetchRoutines(0, activeTab, searchQuery);
-    } catch {
-      Alert.alert(t('common.error'), t('routines.saveError'));
-    } finally {
-      setIsSaving(false);
-    }
+  const handleSaveRoutine = (payload: CreateRoutinePayload, id?: string) => {
+    saveMutation.mutate({ payload, id });
   };
 
-  const handleDeleteRoutine = async (id: string) => {
+  const handleDeleteRoutine = (id: string) => {
     Alert.alert(t('routines.deleteTitle'), t('routines.deleteMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
         style: 'destructive',
-        onPress: async () => {
+        onPress: () => {
           setIsDetailsModalVisible(false);
-          try {
-            await axiosClient.delete(`/workouts/routines/${id}`);
-            await fetchRoutines(0, activeTab, searchQuery);
-          } catch {
-            Alert.alert(t('common.error'), t('routines.deleteError'));
-          }
+          deleteMutation.mutate(id);
         },
       },
     ]);
@@ -122,6 +117,20 @@ export default function RoutinesScreen() {
   const openCreateModal = () => {
     setRoutineToEdit(null);
     setIsModalVisible(true);
+  };
+
+  const handleSearch = () => {
+    setCurrentPage(0);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setCurrentPage(0);
+  };
+
+  const handleTabChange = (tab: 'MINE' | 'CATALOG') => {
+    setActiveTab(tab);
+    setCurrentPage(0);
   };
 
   return (
@@ -149,7 +158,7 @@ export default function RoutinesScreen() {
       <View className="px-6 flex-row mb-5 mt-2">
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setActiveTab('CATALOG')}
+          onPress={() => handleTabChange('CATALOG')}
           style={{
             borderBottomColor:
               activeTab === 'CATALOG' ? colors.brand.primary : 'transparent',
@@ -172,7 +181,7 @@ export default function RoutinesScreen() {
 
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setActiveTab('MINE')}
+          onPress={() => handleTabChange('MINE')}
           style={{
             borderBottomColor:
               activeTab === 'MINE' ? colors.brand.primary : 'transparent',
@@ -211,18 +220,13 @@ export default function RoutinesScreen() {
           placeholderTextColor={colors.content.secondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          onSubmitEditing={() => fetchRoutines(0, activeTab, searchQuery)}
+          onSubmitEditing={handleSearch}
           returnKeyType="search"
           style={{ color: colors.brand.primary }}
           className="text-base ml-3 flex-1"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity
-            onPress={() => {
-              setSearchQuery('');
-              fetchRoutines(0, activeTab, '');
-            }}
-          >
+          <TouchableOpacity onPress={handleClearSearch}>
             <Ionicons name="close-circle" size={18} color={colors.content.secondary} />
           </TouchableOpacity>
         )}
@@ -302,7 +306,7 @@ export default function RoutinesScreen() {
               <View className="flex-row items-center justify-between mx-6 mt-4 mb-8">
                 <TouchableOpacity
                   onPress={() => {
-                    if (currentPage > 0) fetchRoutines(currentPage - 1, activeTab, searchQuery);
+                    if (currentPage > 0) setCurrentPage(currentPage - 1);
                   }}
                   disabled={currentPage === 0}
                   style={{
@@ -329,8 +333,7 @@ export default function RoutinesScreen() {
 
                 <TouchableOpacity
                   onPress={() => {
-                    if (currentPage < totalPages - 1)
-                      fetchRoutines(currentPage + 1, activeTab, searchQuery);
+                    if (currentPage < totalPages - 1) setCurrentPage(currentPage + 1);
                   }}
                   disabled={currentPage >= totalPages - 1}
                   style={{
@@ -380,7 +383,7 @@ export default function RoutinesScreen() {
         isVisible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
         onSave={handleSaveRoutine}
-        isSaving={isSaving}
+        isSaving={saveMutation.isPending}
         initialData={routineToEdit}
       />
     </SafeAreaView>

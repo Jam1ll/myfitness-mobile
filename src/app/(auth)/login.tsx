@@ -1,4 +1,3 @@
-import { axiosClient, setAuthToken } from '../../api/axiosClient';
 import AppText from '@/components/common/AppText';
 import { useTheme } from '@/theme/ThemeProvider';
 import {
@@ -10,6 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Platform, TouchableOpacity, View } from 'react-native';
+import { axiosClient, setAuthToken } from '../../api/axiosClient';
 
 export default function LoginScreen() {
   const { colors } = useTheme();
@@ -62,7 +62,7 @@ export default function LoginScreen() {
       if (!myFitnessJwt) throw new Error('No token received from backend');
 
       await setAuthToken(myFitnessJwt);
-      router.replace('/routines');
+      router.replace('/home');
     } catch (error) {
       console.error('Error connecting to backend:', error);
       Alert.alert(t('common.error'), t('auth.serverError'));

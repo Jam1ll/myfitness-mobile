@@ -17,11 +17,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, LogBox, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-
-LogBox.ignoreLogs(['createAnimatedPropAdapter']);
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({

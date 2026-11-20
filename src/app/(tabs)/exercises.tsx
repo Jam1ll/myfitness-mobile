@@ -1,4 +1,3 @@
-import { axiosClient } from '../../api/axiosClient';
 import AppText from '@/components/common/AppText';
 import CreateExerciseModal, {
   CreateExercisePayload,
@@ -8,7 +7,8 @@ import ExerciseDetailsModal, {
 } from '@/features/catalog/components/ExerciseDetailsModal';
 import { useTheme } from '@/theme/ThemeProvider';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -19,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { catalogApi } from '@/api/catalogApi';
 
 function shortenDescription(description: string) {
   if (!description) return '';
@@ -29,78 +30,70 @@ function shortenDescription(description: string) {
 export default function ExercisesScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
-  const [exercises, setExercises] = useState<ExerciseResponse[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [activeTab, setActiveTab] = useState<'MINE' | 'CATALOG'>('CATALOG');
 
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [exerciseToEdit, setExerciseToEdit] = useState<ExerciseResponse | null>(null);
 
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<ExerciseResponse | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  const fetchExercises = useCallback(
-    async (page: number, tab: 'MINE' | 'CATALOG', search: string) => {
-      setLoading(true);
-      try {
-        const isMine = tab === 'MINE';
-        const response = await axiosClient.get(
-          `/exercises?page=${page}&size=20&mineOnly=${isMine}&search=${search}`,
-        );
-        setExercises(response.data.content ?? []);
-        setTotalPages(response.data.totalPages ?? 1);
-        setCurrentPage(page);
-      } catch {
-        Alert.alert(t('common.error'), t('exercises.loadError'));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [t],
-  );
+  // ── Query: exercises list ─────────────────────────────────────────────────
+  const mineOnly = activeTab === 'MINE';
+  const { data: exercisesPage, isLoading: loading } = useQuery({
+    queryKey: ['exercises', { page: currentPage, mineOnly, search: searchQuery }],
+    queryFn: () =>
+      catalogApi.getExercises({ page: currentPage, size: 20, mineOnly, search: searchQuery }),
+    staleTime: 30_000,
+  });
+  const exercises = (exercisesPage?.content ?? []) as ExerciseResponse[];
+  const totalPages = exercisesPage?.totalPages ?? 1;
 
-  useEffect(() => {
-    fetchExercises(0, activeTab, searchQuery);
-  }, [activeTab]);
-
-  const handleSaveExercise = async (payload: CreateExercisePayload, id?: string) => {
-    setIsSaving(true);
-    try {
-      if (id) {
-        await axiosClient.put(`/exercises/${id}`, payload);
-      } else {
-        await axiosClient.post('/exercises', payload);
-      }
+  // ── Mutation: save (create/update) exercise ───────────────────────────────
+  const saveMutation = useMutation({
+    mutationFn: ({ payload, id }: { payload: CreateExercisePayload; id?: string }) =>
+      id ? catalogApi.updateExercise(id, payload) : catalogApi.createExercise(payload),
+    onSuccess: () => {
       setIsModalVisible(false);
       setExerciseToEdit(null);
-      await fetchExercises(0, activeTab, searchQuery);
-    } catch {
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+    },
+    onError: () => {
       Alert.alert(t('common.error'), t('exercises.saveError'));
-    } finally {
-      setIsSaving(false);
-    }
+    },
+  });
+
+  // ── Mutation: delete exercise ─────────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => catalogApi.deleteExercise(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+    },
+    onError: () => {
+      Alert.alert(t('common.error'), t('exercises.deleteError'));
+    },
+  });
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleSaveExercise = (payload: CreateExercisePayload, id?: string) => {
+    saveMutation.mutate({ payload, id });
   };
 
-  const handleDeleteExercise = async (id: string) => {
+  const handleDeleteExercise = (id: string) => {
     Alert.alert(t('exercises.deleteTitle'), t('exercises.deleteMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
         style: 'destructive',
-        onPress: async () => {
+        onPress: () => {
           setIsDetailsModalVisible(false);
-          try {
-            await axiosClient.delete(`/exercises/${id}`);
-            await fetchExercises(0, activeTab, searchQuery);
-          } catch {
-            Alert.alert(t('common.error'), t('exercises.deleteError'));
-          }
+          deleteMutation.mutate(id);
         },
       },
     ]);
@@ -123,8 +116,8 @@ export default function ExercisesScreen() {
     setIsDetailsModalVisible(true);
     setLoadingDetails(true);
     try {
-      const response = await axiosClient.get(`/exercises/${id}`);
-      setSelectedExercise(response.data);
+      const data = await catalogApi.getExerciseById(id);
+      setSelectedExercise(data as ExerciseResponse);
     } catch {
       Alert.alert(t('common.error'), t('exercises.loadDetailError'));
       setIsDetailsModalVisible(false);
@@ -133,12 +126,9 @@ export default function ExercisesScreen() {
     }
   };
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages - 1) fetchExercises(currentPage + 1, activeTab, searchQuery);
-  };
-
-  const handlePrevPage = () => {
-    if (currentPage > 0) fetchExercises(currentPage - 1, activeTab, searchQuery);
+  const handleTabChange = (tab: 'MINE' | 'CATALOG') => {
+    setActiveTab(tab);
+    setCurrentPage(0);
   };
 
   return (
@@ -167,7 +157,7 @@ export default function ExercisesScreen() {
       <View className="px-6 flex-row mb-5 mt-2">
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setActiveTab('CATALOG')}
+          onPress={() => handleTabChange('CATALOG')}
           style={{
             borderBottomColor:
               activeTab === 'CATALOG' ? colors.brand.primary : 'transparent',
@@ -190,7 +180,7 @@ export default function ExercisesScreen() {
 
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setActiveTab('MINE')}
+          onPress={() => handleTabChange('MINE')}
           style={{
             borderBottomColor:
               activeTab === 'MINE' ? colors.brand.primary : 'transparent',
@@ -229,7 +219,7 @@ export default function ExercisesScreen() {
           placeholderTextColor={colors.content.secondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          onSubmitEditing={() => fetchExercises(0, activeTab, searchQuery)}
+          onSubmitEditing={() => setCurrentPage(0)}
           returnKeyType="search"
           style={{ color: colors.brand.primary }}
           className="text-base ml-3 flex-1"
@@ -238,7 +228,7 @@ export default function ExercisesScreen() {
           <TouchableOpacity
             onPress={() => {
               setSearchQuery('');
-              fetchExercises(0, activeTab, '');
+              setCurrentPage(0);
             }}
           >
             <Ionicons name="close-circle" size={18} color={colors.content.secondary} />
@@ -323,7 +313,9 @@ export default function ExercisesScreen() {
             {totalPages > 1 && (
               <View className="flex-row items-center justify-between mx-6 mt-6 mb-8">
                 <TouchableOpacity
-                  onPress={handlePrevPage}
+                  onPress={() => {
+                    if (currentPage > 0) setCurrentPage(currentPage - 1);
+                  }}
                   disabled={currentPage === 0}
                   style={{
                     backgroundColor:
@@ -348,7 +340,9 @@ export default function ExercisesScreen() {
                 </AppText>
 
                 <TouchableOpacity
-                  onPress={handleNextPage}
+                  onPress={() => {
+                    if (currentPage < totalPages - 1) setCurrentPage(currentPage + 1);
+                  }}
                   disabled={currentPage >= totalPages - 1}
                   style={{
                     backgroundColor:
@@ -399,7 +393,7 @@ export default function ExercisesScreen() {
         isVisible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
         onSave={handleSaveExercise}
-        isSaving={isSaving}
+        isSaving={saveMutation.isPending}
         initialData={exerciseToEdit}
       />
     </SafeAreaView>

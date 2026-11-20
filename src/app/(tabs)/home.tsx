@@ -89,14 +89,15 @@ export default function HomeScreen() {
 
   // Query: User's personal routines
   const { data: routinesPage, isLoading: isLoadingRoutines } = useQuery({
-    queryKey: ['routines', 'mine'],
+    queryKey: ['workouts', 'routines', { page: 0, mineOnly: true, search: '' }],
     queryFn: () => workoutApi.getRoutines({ page: 0, size: 5, mineOnly: true }),
+    staleTime: 30_000,
   });
   const routines = useMemo<RoutineSummary[]>(() => routinesPage?.content ?? [], [routinesPage]);
 
   // Query: Active weekly program
   const { data: activeProgram, isLoading: isLoadingProgram } = useQuery({
-    queryKey: ['programs', 'active'],
+    queryKey: ['workouts', 'programs', 'active'],
     queryFn: async () => {
       try {
         const directRes = await workoutApi.getActiveProgram();
@@ -110,6 +111,7 @@ export default function HomeScreen() {
       }
       return null;
     },
+    staleTime: 30_000,
   });
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -149,9 +151,10 @@ export default function HomeScreen() {
 
   // Query: Today's routine detail (only runs if a routine is scheduled today)
   const { data: todayRoutineDetailData } = useQuery({
-    queryKey: ['routines', 'detail', todayRoutineId],
+    queryKey: ['workouts', 'routines', 'detail', todayRoutineId],
     queryFn: () => workoutApi.getRoutineById(todayRoutineId!),
     enabled: Boolean(todayRoutineId),
+    staleTime: 30_000,
   });
 
   const todayRoutineDetail = useMemo(() => {

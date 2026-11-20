@@ -1,5 +1,4 @@
 import { useTypography } from '@/theme/typography';
-import React from 'react';
 import { StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
 
 export interface AppTextProps extends TextProps {
@@ -38,8 +37,8 @@ export function AppText({
   const effectiveWeight: TextStyle['fontWeight'] = isRegularFromProps
     ? 'normal'
     : isBoldFromClass || isBoldFromProps || isBoldFromStyle
-    ? 'bold'
-    : flattenedStyle.fontWeight;
+      ? 'bold'
+      : flattenedStyle.fontWeight;
 
   const fontName = getFont(effectiveWeight);
 

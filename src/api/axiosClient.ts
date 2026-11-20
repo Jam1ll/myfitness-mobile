@@ -3,7 +3,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.0.5:8080/api/v1';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.zielrep.app/api/v1';
 
 let memoryToken: string | null = null;
 
@@ -26,7 +26,7 @@ export const setAuthToken = async (token: string | null) => {
 
 export const axiosClient = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 25000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -42,8 +42,6 @@ axiosClient.interceptors.request.use(
         memoryToken = await SecureStore.getItemAsync('jwt_token');
       }
     }
-
-    console.log(`[Axios] Petición a ${config.url} | Token:`, memoryToken ? `${memoryToken.substring(0, 15)}...` : 'NULO');
 
     if (!config.headers) {
       config.headers = {} as any;
@@ -76,9 +74,7 @@ axiosClient.interceptors.request.use(
 
     if (__DEV__) {
       console.log(`-------------------------------------------`);
-      console.log(`[Axios Outgoing] ${config.method} -> ${config.url}`);
-      console.log(`[Headers]`, JSON.stringify(config.headers, null, 2));
-      console.log(`[Payload Data]`, JSON.stringify(config.data, null, 2));
+      console.log(`[Axios Outgoing] ${config.method?.toUpperCase()} -> ${config.url}`);
       console.log(`-------------------------------------------`);
     }
 
@@ -91,10 +87,20 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      console.log("[Axios] Error 401 detectado, borrando credenciales...");
+    const status = error.response?.status;
+
+    if (__DEV__) {
+      const method = error.config?.method?.toUpperCase() ?? '?';
+      const url = error.config?.url ?? '?';
+      const detail = error.response?.data ?? error.message;
+      console.error(`[Axios Error] ${method} ${url} → ${status ?? 'NO_RESPONSE'}`, detail);
+    }
+
+    if (status === 401) {
+      console.log("[Axios] Error 401 detected, clearing credentials...");
       await setAuthToken(null);
     }
+
     return Promise.reject(error);
   }
 );
