@@ -6,16 +6,14 @@ import type {
   SessionExercise
 } from '@/types/session';
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import { create } from 'zustand';
-import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { safeWorkoutStorage } from './storage';
 export { safeWorkoutStorage };
 
 export interface WorkoutState {
-  // State
   activeSession: ActiveSession | null;
   isResting: boolean;
   restTimeRemaining: number;
@@ -25,7 +23,7 @@ export interface WorkoutState {
   startSession: (
     routineId: string | null,
     name: string,
-    exercises: Array<{ exerciseId: string; name: string }>,
+    exercises: Array<{ exerciseId: string; name: string; restTimeSeconds?: number }>,
   ) => void;
   updateSet: (
     exerciseIndex: number,
@@ -35,7 +33,11 @@ export interface WorkoutState {
   addSetToExercise: (exerciseIndex: number) => void;
   removeSetFromExercise: (exerciseIndex: number, setIndex: number) => void;
   reorderExercises: (fromIndex: number, toIndex: number) => void;
-  addExerciseToSession: (exercise: { exerciseId: string; name: string }) => void;
+  addExerciseToSession: (exercise: {
+    exerciseId: string;
+    name: string;
+    restTimeSeconds?: number;
+  }) => void;
   removeExerciseFromSession: (exerciseIndex: number) => void;
   cancelSession: () => void;
   completeSession: () => Promise<boolean>;
@@ -62,6 +64,7 @@ export const useWorkoutStore = create<WorkoutState>()(
           name: ex.name,
           orderIndex: index,
           notes: null,
+          restTimeSeconds: ex.restTimeSeconds ?? 60,
           sets: [
             {
               setNumber: 1,
@@ -224,6 +227,7 @@ export const useWorkoutStore = create<WorkoutState>()(
             name: exercise.name,
             orderIndex: state.activeSession.exercises.length,
             notes: null,
+            restTimeSeconds: exercise.restTimeSeconds ?? 60,
             sets: [
               {
                 setNumber: 1,
@@ -340,7 +344,7 @@ export const useWorkoutStore = create<WorkoutState>()(
           });
 
           Alert.alert('¡Excelente!', 'Sesión guardada exitosamente.');
-          return true; // <--- RETORNA TRUE. Éxito total en el servidor.
+          return true;
         } catch (error: any) {
           console.error(
             '[WorkoutStore] Error detallado del servidor:',
@@ -395,7 +399,6 @@ export const useWorkoutStore = create<WorkoutState>()(
 
       setIsResting: (isResting) => set({ isResting }),
 
-      // FIX: Implementation handles both direct value and updater function
       setRestTimeRemaining: (valOrUpdater) =>
         set((state) => ({
           restTimeRemaining:
@@ -407,7 +410,6 @@ export const useWorkoutStore = create<WorkoutState>()(
     {
       name: 'workout-storage',
       storage: createJSONStorage(() => safeWorkoutStorage),
-      // Guardar únicamente el estado activo y la cola offline
       partialize: (state) => ({
         activeSession: state.activeSession,
         offlineQueue: state.offlineQueue,

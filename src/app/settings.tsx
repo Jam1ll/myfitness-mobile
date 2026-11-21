@@ -69,6 +69,8 @@ export default function SettingsScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20 }}
       >
         {/* ── Screen Intro ─────────────────────────────────────────────────── */}

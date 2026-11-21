@@ -165,7 +165,12 @@ export default function ProgramsScreen() {
         </AppText>
       </View>
 
-      <ScrollView className="flex-1 mt-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1 mt-4"
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         {loading ? (
           <ActivityIndicator className="mt-10" color={colors.brand.primary} size="large" />
         ) : (

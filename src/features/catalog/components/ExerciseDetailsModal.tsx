@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -51,7 +52,10 @@ export default function ExerciseDetailsModal({
         <Pressable
           style={{ backgroundColor: colors.brand.background + 'B3' }}
           className="absolute inset-0"
-          onPress={onClose}
+          onPress={() => {
+            Keyboard.dismiss();
+            onClose();
+          }}
         />
 
         <View
@@ -146,7 +150,7 @@ export default function ExerciseDetailsModal({
               </AppText>
 
               {/* Action Buttons */}
-              <View className="flex-row gap-3">
+              <View className="flex-row gap-1">
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={onClose}

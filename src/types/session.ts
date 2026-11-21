@@ -11,6 +11,7 @@ export interface SessionExercise {
   name: string;
   orderIndex: number;
   notes: string | null;
+  restTimeSeconds?: number;
   sets: ExerciseSet[];
 }
 
@@ -36,4 +37,3 @@ export interface OfflineQueueItem {
   payload: SessionPayload | any;
   timestamp: number;
 }
-

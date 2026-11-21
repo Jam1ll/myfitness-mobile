@@ -10,6 +10,10 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
   TextInput,
   TouchableOpacity,
@@ -139,100 +143,112 @@ export default function RoutinesScreen() {
       className="flex-1"
       edges={['top']}
     >
-      <View className="px-6 mt-4 mb-2">
-        <AppText
-          weight="bold"
-          style={{ color: colors.brand.primary }}
-          className="text-3xl font-bold"
-        >
-          {t('routines.title')}
-        </AppText>
-        <AppText
-          style={{ color: colors.content.secondary }}
-          className="text-base mt-1"
-        >
-          {t('routines.subtitle')}
-        </AppText>
-      </View>
-
-      <View className="px-6 flex-row mb-5 mt-2">
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => handleTabChange('CATALOG')}
-          style={{
-            borderBottomColor:
-              activeTab === 'CATALOG' ? colors.brand.primary : 'transparent',
-          }}
-          className="mr-4 pb-2 border-b-2"
-        >
-          <AppText
-            weight={activeTab === 'CATALOG' ? 'bold' : 'regular'}
-            style={{
-              color:
-                activeTab === 'CATALOG'
-                  ? colors.brand.primary
-                  : colors.content.tertiary,
-            }}
-            className="text-base font-semibold"
-          >
-            {t('routines.catalogTab')}
-          </AppText>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => handleTabChange('MINE')}
-          style={{
-            borderBottomColor:
-              activeTab === 'MINE' ? colors.brand.primary : 'transparent',
-          }}
-          className="pb-2 border-b-2"
-        >
-          <AppText
-            weight={activeTab === 'MINE' ? 'bold' : 'regular'}
-            style={{
-              color:
-                activeTab === 'MINE'
-                  ? colors.brand.primary
-                  : colors.content.tertiary,
-            }}
-            className="text-base font-semibold"
-          >
-            {t('routines.myRoutinesTab')}
-          </AppText>
-        </TouchableOpacity>
-      </View>
-
-      <View
-        style={{
-          backgroundColor: colors.brand.surface,
-          borderColor: colors.brand.surfaceBorder,
-        }}
-        className="mx-6 mb-4 rounded-2xl px-4 py-4 flex-row items-center border"
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <Ionicons name="search-outline" size={18} color={colors.content.secondary} />
-        <TextInput
-          placeholder={
-            activeTab === 'CATALOG'
-              ? t('routines.searchPlaceholderCatalog')
-              : t('routines.searchPlaceholderMine')
-          }
-          placeholderTextColor={colors.content.secondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onSubmitEditing={handleSearch}
-          returnKeyType="search"
-          style={{ color: colors.brand.primary }}
-          className="text-base ml-3 flex-1"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={handleClearSearch}>
-            <Ionicons name="close-circle" size={18} color={colors.content.secondary} />
-          </TouchableOpacity>
-        )}
-      </View>
+        <Pressable onPress={Keyboard.dismiss}>
+          <View className="px-6 mt-4 mb-2">
+            <AppText
+              weight="bold"
+              style={{ color: colors.brand.primary }}
+              className="text-3xl font-bold"
+            >
+              {t('routines.title')}
+            </AppText>
+            <AppText
+              style={{ color: colors.content.secondary }}
+              className="text-base mt-1"
+            >
+              {t('routines.subtitle')}
+            </AppText>
+          </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+          <View className="px-6 flex-row mb-5 mt-2">
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => handleTabChange('CATALOG')}
+              style={{
+                borderBottomColor:
+                  activeTab === 'CATALOG' ? colors.brand.primary : 'transparent',
+              }}
+              className="mr-4 pb-2 border-b-2"
+            >
+              <AppText
+                weight={activeTab === 'CATALOG' ? 'bold' : 'regular'}
+                style={{
+                  color:
+                    activeTab === 'CATALOG'
+                      ? colors.brand.primary
+                      : colors.content.tertiary,
+                }}
+                className="text-base font-semibold"
+              >
+                {t('routines.catalogTab')}
+              </AppText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => handleTabChange('MINE')}
+              style={{
+                borderBottomColor:
+                  activeTab === 'MINE' ? colors.brand.primary : 'transparent',
+              }}
+              className="pb-2 border-b-2"
+            >
+              <AppText
+                weight={activeTab === 'MINE' ? 'bold' : 'regular'}
+                style={{
+                  color:
+                    activeTab === 'MINE'
+                      ? colors.brand.primary
+                      : colors.content.tertiary,
+                }}
+                className="text-base font-semibold"
+              >
+                {t('routines.myRoutinesTab')}
+              </AppText>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+
+        <View
+          style={{
+            backgroundColor: colors.brand.surface,
+            borderColor: colors.brand.surfaceBorder,
+          }}
+          className="mx-6 mb-4 rounded-2xl px-4 py-4 flex-row items-center border"
+        >
+          <Ionicons name="search-outline" size={18} color={colors.content.secondary} />
+          <TextInput
+            placeholder={
+              activeTab === 'CATALOG'
+                ? t('routines.searchPlaceholderCatalog')
+                : t('routines.searchPlaceholderMine')
+            }
+            placeholderTextColor={colors.content.secondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+            style={{ color: colors.brand.primary }}
+            className="text-base ml-3 flex-1"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={handleClearSearch}>
+              <Ionicons name="close-circle" size={18} color={colors.content.secondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <ScrollView
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
         {loading ? (
           <ActivityIndicator className="mt-10" color={colors.brand.primary} size="large" />
         ) : (
@@ -386,6 +402,7 @@ export default function RoutinesScreen() {
         isSaving={saveMutation.isPending}
         initialData={routineToEdit}
       />
-    </SafeAreaView>
-  );
+    </KeyboardAvoidingView>
+  </SafeAreaView>
+);
 }

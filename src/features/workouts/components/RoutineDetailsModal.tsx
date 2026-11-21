@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -45,7 +46,10 @@ export default function RoutineDetailsModal({
         <Pressable
           style={{ backgroundColor: colors.brand.background + 'B3' }}
           className="absolute inset-0"
-          onPress={onClose}
+          onPress={() => {
+            Keyboard.dismiss();
+            onClose();
+          }}
         />
 
         <View

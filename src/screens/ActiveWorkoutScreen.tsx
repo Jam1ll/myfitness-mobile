@@ -55,7 +55,7 @@ export default function ActiveWorkoutScreen() {
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
-    if (isResting && restTimeRemaining > 0) {
+    if (selectedExerciseIndex === null && isResting && restTimeRemaining > 0) {
       interval = setInterval(() => setRestTimeRemaining(restTimeRemaining - 1), 1000);
     } else if (isResting && restTimeRemaining <= 0) {
       setIsResting(false);
@@ -63,7 +63,7 @@ export default function ActiveWorkoutScreen() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isResting, restTimeRemaining, setIsResting, setRestTimeRemaining]);
+  }, [selectedExerciseIndex, isResting, restTimeRemaining, setIsResting, setRestTimeRemaining]);
 
   const handleConfirmAddExercises = async (ids: string[]) => {
     setIsSelectorVisible(false);

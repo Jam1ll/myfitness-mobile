@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   Modal,
   Pressable,
   TouchableOpacity,
@@ -76,7 +77,10 @@ export default function ExerciseSelectorModal({
         <Pressable
           style={{ backgroundColor: colors.brand.background + 'B3' }}
           className="absolute inset-0"
-          onPress={onClose}
+          onPress={() => {
+            Keyboard.dismiss();
+            onClose();
+          }}
         />
 
         <View
@@ -105,6 +109,8 @@ export default function ExerciseSelectorModal({
               data={exercises}
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               renderItem={({ item }) => {
                 const isSelected = selectedIds.includes(item.id);
                 return (

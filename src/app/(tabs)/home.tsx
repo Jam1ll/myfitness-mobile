@@ -191,11 +191,12 @@ export default function HomeScreen() {
 
     if (!todayRoutineId) return;
 
-    let exercises: Array<{ exerciseId: string; name: string }> = [];
+    let exercises: Array<{ exerciseId: string; name: string; restTimeSeconds?: number }> = [];
     if (todayRoutineDetailData?.enrichedRoutineExercises?.length) {
       exercises = todayRoutineDetailData.enrichedRoutineExercises.map((ex) => ({
         exerciseId: ex.exerciseId,
         name: ex.name,
+        restTimeSeconds: ex.restTimeSeconds,
       }));
     } else {
       try {
@@ -203,6 +204,7 @@ export default function HomeScreen() {
         exercises = (full.enrichedRoutineExercises ?? []).map((ex) => ({
           exerciseId: ex.exerciseId,
           name: ex.name,
+          restTimeSeconds: ex.restTimeSeconds,
         }));
       } catch (e) {
         console.error('Error fetching today routine exercises:', e);
@@ -236,6 +238,7 @@ export default function HomeScreen() {
         const exercises = (full.enrichedRoutineExercises ?? []).map((ex) => ({
           exerciseId: ex.exerciseId,
           name: ex.name,
+          restTimeSeconds: ex.restTimeSeconds,
         }));
         startSession(routine.id, routine.name, exercises);
         router.push('/active-workout');
@@ -599,7 +602,12 @@ export default function HomeScreen() {
       className="flex-1"
       edges={['top']}
     >
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         <View className="px-6 pb-8">
           {/* ── Header ─────────────────────────────────────────────────── */}
           <View className="mt-4 mb-6">

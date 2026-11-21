@@ -189,7 +189,6 @@
     "nextExercise": "Siguiente ejercicio: {{name}}",
     "backToOverview": "Volver a la vista general",
     "addAnotherSet": "+ Añadir otra serie",
-    "manualLogHint": "¿Deseas registrar manualmente sin cronómetro?",
     "setNumber": "Serie {{number}}"
   },
   "modals": {

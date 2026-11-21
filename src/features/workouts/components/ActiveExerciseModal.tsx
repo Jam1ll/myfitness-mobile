@@ -15,8 +15,19 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { CircularProgressBase } from 'react-native-circular-progress-indicator';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedProps,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export type WeightUnit = 'KG' | 'LBS' | 'BODYWEIGHT';
 export type ModalPhase = 'READY' | 'ACTIVE' | 'LOGGING' | 'COMPLETED';
@@ -30,6 +41,58 @@ interface ActiveExerciseModalProps {
   totalExercises: number;
   nextExerciseName?: string;
   onSelectNextExercise?: () => void;
+}
+
+interface SmoothProgressRingProps {
+  diameter: number;
+  strokeWidth: number;
+  progress: SharedValue<number>;
+  activeColor: string;
+  trackColor: string;
+}
+
+function SmoothProgressRing({
+  diameter,
+  strokeWidth,
+  progress,
+  activeColor,
+  trackColor,
+}: SmoothProgressRingProps) {
+  const center = diameter / 2;
+  const radius = Math.max(1, (diameter - strokeWidth) / 2);
+  const circumference = 2 * Math.PI * radius;
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - Math.max(0, Math.min(1, progress.value))),
+  }));
+
+  return (
+    <Svg
+      width={diameter}
+      height={diameter}
+      style={{ transform: [{ rotate: '-90deg' }] }}
+    >
+      <Circle
+        cx={center}
+        cy={center}
+        r={radius}
+        stroke={trackColor}
+        strokeWidth={strokeWidth}
+        fill="transparent"
+      />
+      <AnimatedCircle
+        cx={center}
+        cy={center}
+        r={radius}
+        stroke={activeColor}
+        strokeWidth={strokeWidth}
+        strokeDasharray={`${circumference} ${circumference}`}
+        strokeLinecap="round"
+        fill="transparent"
+        animatedProps={animatedProps}
+      />
+    </Svg>
+  );
 }
 
 function formatStopwatch(seconds: number): string {
@@ -57,24 +120,59 @@ export default function ActiveExerciseModal({
   const { width, height } = useWindowDimensions();
 
   const tutDiameter = Math.min(width * 0.78, height * 0.38, 320);
-  const tutRadius = tutDiameter / 2;
   const tutFontSize = tutDiameter * 0.18;
   const tutStrokeWidth = Math.max(8, tutDiameter * 0.043);
 
   const exercise = activeSession?.exercises[exerciseIndex];
+  const configuredRest =
+    (exercise as { restTimeSeconds?: number } | undefined)?.restTimeSeconds ?? 60;
 
   const [phase, setPhase] = useState<ModalPhase>('READY');
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   const [unit, setUnit] = useState<WeightUnit>('KG');
   const [tutSeconds, setTutSeconds] = useState(0);
   const [restSeconds, setRestSeconds] = useState(0);
-  const [totalRestDuration, setTotalRestDuration] = useState(60);
 
   const [weightText, setWeightText] = useState('');
   const [repsText, setRepsText] = useState('');
   const [rpeText, setRpeText] = useState('8');
 
   const initializedExerciseRef = useRef<number | null>(null);
+  const restEndTimeRef = useRef<number | null>(null);
+
+  // Shared values running at 60/120fps on UI thread
+  const restProgress = useSharedValue(0);
+  const tutProgress = useSharedValue(0);
+
+  const startRestCountdown = useCallback(
+    (durationMs: number, resetRingToFull: boolean) => {
+      cancelAnimation(restProgress);
+      if (durationMs <= 0) {
+        restEndTimeRef.current = null;
+        restProgress.value = 0;
+        setRestSeconds(0);
+        setRestTimeRemaining(0);
+        setIsResting(false);
+        return;
+      }
+
+      restEndTimeRef.current = Date.now() + durationMs;
+      if (resetRingToFull || restProgress.value <= 0.01) {
+        restProgress.value = 1;
+      }
+      // Animates linearly from current arc position to 0 over exact remaining ms
+      restProgress.value = withTiming(0, {
+        duration: durationMs,
+        easing: Easing.linear,
+      });
+
+      const secs = Math.ceil(durationMs / 1000);
+      setRestSeconds(secs);
+      setRestTimeRemaining(secs);
+      setIsResting(true);
+    },
+    [restProgress, setIsResting, setRestTimeRemaining],
+  );
 
   const loadSetData = useCallback((setObj: ExerciseSet | undefined, activeUnit: WeightUnit) => {
     if (!setObj) {
@@ -146,70 +244,104 @@ export default function ActiveExerciseModal({
     }
   }, [isVisible, exerciseIndex, exercise, loadSetData, unit]);
 
+  // Initialize rest timer from store on modal open or active exercise change
+  useEffect(() => {
+    if (!isVisible) return;
+    const storeState = useWorkoutStore.getState();
+    if (storeState.isResting && storeState.restTimeRemaining > 0) {
+      const remainingMs = storeState.restTimeRemaining * 1000;
+      const baseTotalMs = Math.max(configuredRest * 1000, remainingMs, 1000);
+      cancelAnimation(restProgress);
+      restEndTimeRef.current = Date.now() + remainingMs;
+      restProgress.value = Math.min(1, remainingMs / baseTotalMs);
+      restProgress.value = withTiming(0, {
+        duration: remainingMs,
+        easing: Easing.linear,
+      });
+      setRestSeconds(storeState.restTimeRemaining);
+    } else {
+      startRestCountdown(0, true);
+    }
+  }, [isVisible, exerciseIndex, configuredRest, restProgress, startRestCountdown]);
+
+  // Active set TUT stopwatch + smooth 60s sweep
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
     if (isVisible && phase === 'ACTIVE') {
+      tutProgress.value = 0;
+      tutProgress.value = withRepeat(
+        withTiming(1, { duration: 60000, easing: Easing.linear }),
+        -1,
+        false,
+      );
       interval = setInterval(() => {
         setTutSeconds((prev) => prev + 1);
       }, 1000);
+    } else {
+      cancelAnimation(tutProgress);
+      tutProgress.value = 0;
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isVisible, phase]);
+  }, [isVisible, phase, tutProgress]);
 
+  // Timestamp-locked rest countdown ticker
+  const isRestTicking = isVisible && (phase === 'LOGGING' || phase === 'READY') && restSeconds > 0;
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (isVisible && (phase === 'LOGGING' || phase === 'READY') && restSeconds > 0) {
-      interval = setInterval(() => {
-        setRestSeconds((prev) => {
-          if (prev <= 1) {
-            setIsResting(false);
-            setRestTimeRemaining(0);
-            return 0;
-          }
-          const next = prev - 1;
-          setRestTimeRemaining(next);
-          return next;
-        });
-      }, 1000);
+    if (!isRestTicking) return;
+
+    const interval = setInterval(() => {
+      const endTime = restEndTimeRef.current;
+      if (!endTime) {
+        setRestSeconds(0);
+        return;
+      }
+      const remainingMs = endTime - Date.now();
+      if (remainingMs <= 0) {
+        restEndTimeRef.current = null;
+        setRestSeconds(0);
+      } else {
+        setRestSeconds(Math.ceil(remainingMs / 1000));
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [isRestTicking]);
+
+  // Synchronize rest state to global store post-render
+  useEffect(() => {
+    if (!isVisible) return;
+    setRestTimeRemaining(restSeconds);
+    if (restSeconds <= 0) {
+      setIsResting(false);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isVisible, phase, restSeconds, setIsResting, setRestTimeRemaining]);
+  }, [isVisible, restSeconds, setRestTimeRemaining, setIsResting]);
 
   const handleStartSet = () => {
-    setRestSeconds(0);
-    setIsResting(false);
-    setRestTimeRemaining(0);
+    startRestCountdown(0, true);
     setTutSeconds(0);
     setPhase('ACTIVE');
   };
 
   const handleFinishSet = () => {
-    setTotalRestDuration(60);
-    setRestSeconds(60);
-    setIsResting(true);
-    setRestTimeRemaining(60);
+    startRestCountdown(configuredRest * 1000, true);
     setPhase('LOGGING');
   };
 
   const handleSkipRest = () => {
-    setRestSeconds(0);
-    setIsResting(false);
-    setRestTimeRemaining(0);
+    startRestCountdown(0, true);
   };
 
-  const handleAdjustRest = (delta: number) => {
-    setRestSeconds((prev) => {
-      const updated = Math.max(0, prev + delta);
-      setRestTimeRemaining(updated);
-      if (updated > totalRestDuration) {
-        setTotalRestDuration(updated);
-      }
-      return updated;
-    });
+  const handleAdjustRest = (deltaSeconds: number) => {
+    const currentRemainingMs =
+      restEndTimeRef.current !== null
+        ? Math.max(0, restEndTimeRef.current - Date.now())
+        : restSeconds * 1000;
+
+    const newRemainingMs = Math.max(0, currentRemainingMs + deltaSeconds * 1000);
+    // Keep current arc progress and stretch/compress remaining duration smoothly
+    startRestCountdown(newRemainingMs, currentRemainingMs <= 0);
   };
 
   const handleUnitChange = (newUnit: WeightUnit) => {
@@ -343,12 +475,10 @@ export default function ActiveExerciseModal({
 
   if (!exercise) return null;
 
-  const currentSet = exercise.sets[currentSetIndex];
   const prevSet = currentSetIndex > 0 ? exercise.sets[currentSetIndex - 1] : undefined;
   const isLastExercise = exerciseIndex >= totalExercises - 1;
 
   const restDiameter = tutDiameter * 0.9;
-  const restRadius = tutRadius * 0.9;
 
   return (
     <Modal
@@ -442,13 +572,13 @@ export default function ActiveExerciseModal({
                     backgroundColor: isCurrent
                       ? colors.brand.primary
                       : isCompleted
-                      ? colors.status.info + '20'
-                      : colors.brand.surfaceAlt,
+                        ? colors.status.info + '20'
+                        : colors.brand.surfaceAlt,
                     borderColor: isCurrent
                       ? colors.brand.primary
                       : isCompleted
-                      ? colors.status.info + '40'
-                      : colors.brand.surfaceBorder,
+                        ? colors.status.info + '40'
+                        : colors.brand.surfaceBorder,
                   }}
                   className="flex-row items-center py-2 px-4 rounded-full mr-2 border"
                 >
@@ -466,8 +596,8 @@ export default function ActiveExerciseModal({
                       color: isCurrent
                         ? colors.brand.background
                         : isCompleted
-                        ? colors.status.infoLight
-                        : colors.content.secondary,
+                          ? colors.status.infoLight
+                          : colors.content.secondary,
                     }}
                     className="text-sm font-bold"
                   >
@@ -480,12 +610,18 @@ export default function ActiveExerciseModal({
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          className="flex-1"
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
         >
           <ScrollView
-            contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingVertical: 16 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingHorizontal: 20,
+              paddingTop: 16,
+              paddingBottom: 48,
+            }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
             {/* ════ PHASE A: READY ════ */}
             {phase === 'READY' && (
@@ -633,12 +769,6 @@ export default function ActiveExerciseModal({
                   onPress={() => handleSelectSet(currentSetIndex)}
                   className="py-2"
                 >
-                  <AppText
-                    style={{ color: colors.content.muted }}
-                    className="text-sm underline"
-                  >
-                    {t('activeExercise.manualLogHint')}
-                  </AppText>
                 </TouchableOpacity>
               </View>
             )}
@@ -687,15 +817,12 @@ export default function ActiveExerciseModal({
                     }}
                   >
                     <View style={{ position: 'absolute', top: 0, left: 0 }}>
-                      <CircularProgressBase
-                        value={tutSeconds % 60}
-                        maxValue={60}
-                        radius={tutRadius}
-                        duration={1000}
-                        activeStrokeColor={colors.status.info}
-                        inActiveStrokeColor={colors.brand.surfaceBorder}
-                        activeStrokeWidth={tutStrokeWidth}
-                        inActiveStrokeWidth={tutStrokeWidth}
+                      <SmoothProgressRing
+                        diameter={tutDiameter}
+                        strokeWidth={tutStrokeWidth}
+                        progress={tutProgress}
+                        activeColor={colors.brand.surfaceBorder}
+                        trackColor={colors.brand.surfaceBorder}
                       />
                     </View>
                     <View style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -768,15 +895,12 @@ export default function ActiveExerciseModal({
                       }}
                     >
                       <View style={{ position: 'absolute', top: 0, left: 0 }}>
-                        <CircularProgressBase
-                          value={restSeconds}
-                          maxValue={totalRestDuration || 60}
-                          radius={restRadius}
-                          duration={1000}
-                          activeStrokeColor={colors.status.info}
-                          inActiveStrokeColor={colors.brand.surfaceBorder}
-                          activeStrokeWidth={tutStrokeWidth}
-                          inActiveStrokeWidth={tutStrokeWidth}
+                        <SmoothProgressRing
+                          diameter={restDiameter}
+                          strokeWidth={tutStrokeWidth}
+                          progress={restProgress}
+                          activeColor={colors.status.info}
+                          trackColor={colors.brand.surfaceBorder}
                         />
                       </View>
                       <View style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -1238,9 +1362,8 @@ export default function ActiveExerciseModal({
                           : colors.brand.primary,
                       borderColor: colors.brand.surfaceBorder,
                     }}
-                    className={`w-full py-5 rounded-2xl flex-row items-center justify-center ${
-                      !isLastExercise && nextExerciseName ? 'border' : 'shadow-lg'
-                    }`}
+                    className={`w-full py-5 rounded-2xl flex-row items-center justify-center ${!isLastExercise && nextExerciseName ? 'border' : 'shadow-lg'
+                      }`}
                   >
                     <AppText
                       weight="bold"

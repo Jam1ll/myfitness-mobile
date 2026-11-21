@@ -93,7 +93,11 @@ axiosClient.interceptors.response.use(
       const method = error.config?.method?.toUpperCase() ?? '?';
       const url = error.config?.url ?? '?';
       const detail = error.response?.data ?? error.message;
-      console.error(`[Axios Error] ${method} ${url} → ${status ?? 'NO_RESPONSE'}`, detail);
+      if (status === 404) {
+        console.log(`[Axios Expected 404] ${method} ${url} → 404`, detail);
+      } else {
+        console.error(`[Axios Error] ${method} ${url} → ${status ?? 'NO_RESPONSE'}`, detail);
+      }
     }
 
     if (status === 401) {

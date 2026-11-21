@@ -13,7 +13,10 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -157,33 +160,49 @@ export default function CreateRoutineModal({
       visible={isVisible}
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end">
-        <Pressable
-          style={{ backgroundColor: colors.brand.background + 'B3' }}
-          className="absolute inset-0"
-          onPress={onClose}
-        />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View className="flex-1 justify-end">
+          <Pressable
+            style={{ backgroundColor: colors.brand.background + 'B3' }}
+            className="absolute inset-0"
+            onPress={() => {
+              Keyboard.dismiss();
+              onClose();
+            }}
+          />
 
-        <View
-          style={{ backgroundColor: colors.brand.surface }}
-          className="rounded-t-3xl px-6 pt-3 pb-10 max-h-[90%] min-h-[80%]"
-        >
-          <View className="items-center mb-4">
-            <View
-              style={{ backgroundColor: colors.brand.muted }}
-              className="w-12 h-1.5 rounded-full"
-            />
-          </View>
-
-          <AppText
-            weight="bold"
-            style={{ color: colors.brand.primary }}
-            className="text-2xl font-bold mb-4"
+          <View
+            style={{ backgroundColor: colors.brand.surface }}
+            className="rounded-t-3xl px-6 pt-3 pb-10 max-h-[90%] min-h-[80%]"
           >
-            {initialData ? t('routines.editRoutine') : t('routines.createRoutine')}
-          </AppText>
+            {/* Drag indicator & Header (tap to dismiss keyboard) */}
+            <Pressable onPress={Keyboard.dismiss}>
+              <View className="items-center mb-4">
+                <View
+                  style={{ backgroundColor: colors.brand.muted }}
+                  className="w-12 h-1.5 rounded-full"
+                />
+              </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+              <AppText
+                weight="bold"
+                style={{ color: colors.brand.primary }}
+                className="text-2xl font-bold mb-4"
+              >
+                {initialData ? t('routines.editRoutine') : t('routines.createRoutine')}
+              </AppText>
+            </Pressable>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={{ paddingBottom: 40 }}
+              className="flex-1"
+            >
             {/* Routine Name */}
             <AppText
               weight="bold"
@@ -433,6 +452,7 @@ export default function CreateRoutineModal({
           initialSelectedIds={routineExercises.map((e) => e.exerciseId)}
         />
       </View>
-    </Modal>
-  );
+    </KeyboardAvoidingView>
+  </Modal>
+);
 }
